@@ -3,6 +3,7 @@
 import { useState, useRef } from 'react';
 import Link from 'next/link';
 import { useInventory, ProductItem } from '@/context/InventoryContext';
+import { authenticateStaff } from '@/lib/staffAuth';
 import { sound } from '@/utils/soundEffects';
 
 type StaffMember = {
@@ -65,12 +66,12 @@ const PRESET_IMAGES = [
 export default function AdminInventoryPage() {
   const { products, addProduct, updateProduct, deleteProduct, resetInventory } = useInventory();
 
-  // Authentication: username + password (craft123)
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<StaffMember | null>(null);
   const [loginError, setLoginError] = useState(false);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -110,36 +111,27 @@ export default function AdminInventoryPage() {
     setTimeout(() => setToastMessage(null), 3500);
   };
 
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const u = username.trim().toLowerCase();
-    const p = password.trim().toLowerCase();
+    setIsLoggingIn(true);
+    try {
+      const staffId = await authenticateStaff(username, password);
+      const matched = staffId ? STAFF_ADMINS[staffId] : undefined;
 
-    let matched: StaffMember | null = null;
-    if (u === 'anna123' || u === 'anna') {
-      matched = STAFF_ADMINS.anna;
-    } else if (u === 'kaitlyn123' || u === 'kaitlyn') {
-      matched = STAFF_ADMINS.kaitlyn;
-    } else if (u === 'nicole123' || u === 'nicole') {
-      matched = STAFF_ADMINS.nicole;
-    } else if (u === 'admin' || u === 'craft123') {
-      matched = STAFF_ADMINS.anna;
-    }
+      if (!matched) {
+        sound.playClick();
+        setLoginError(true);
+        return;
+      }
 
-    // Password must be craft123 (or Anna123 / kaitlyn123 / nicole123 for convenience)
-    const isPasswordValid =
-      p === 'craft123' ||
-      (matched && p === `${matched.id}123`) ||
-      p === 'admin123';
-
-    if (matched && isPasswordValid) {
       sound.playFanfare();
       setCurrentStaff(matched);
       setIsAuthenticated(true);
       setLoginError(false);
-    } else {
-      sound.playClick();
-      setLoginError(true);
+      setUsername('');
+      setPassword('');
+    } finally {
+      setIsLoggingIn(false);
     }
   };
 
@@ -382,8 +374,8 @@ export default function AdminInventoryPage() {
                 </div>
               )}
 
-              <button type="submit" className="primary-button staff-login-btn">
-                Unlock Inventory Database →
+              <button type="submit" className="primary-button staff-login-btn" disabled={isLoggingIn}>
+                {isLoggingIn ? 'Signing in...' : 'Unlock Inventory Database →'}
               </button>
             </form>
 

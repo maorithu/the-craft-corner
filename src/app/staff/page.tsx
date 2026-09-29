@@ -3,11 +3,11 @@
 import { useState } from 'react';
 import Link from 'next/link';
 import { useCart, PlacedOrder } from '@/context/CartContext';
+import { authenticateStaff } from '@/lib/staffAuth';
 import { sound } from '@/utils/soundEffects';
 
 type StaffAccount = {
   id: string; // 'anna' | 'kaitlyn' | 'nicole'
-  username: string; // 'Anna123' | 'kaitlyn123' | 'nicole123'
   name: string; // 'Anna' | 'Kaitlyn' | 'Nicole'
   icon: string;
   role: string;
@@ -22,7 +22,6 @@ type StaffAccount = {
 const STAFF_MEMBERS: StaffAccount[] = [
   {
     id: 'anna',
-    username: 'Anna123',
     name: 'Anna',
     icon: '🧋',
     role: 'Lead Manager & SlimeTea Director',
@@ -35,7 +34,6 @@ const STAFF_MEMBERS: StaffAccount[] = [
   },
   {
     id: 'kaitlyn',
-    username: 'kaitlyn123',
     name: 'Kaitlyn',
     icon: '🐉',
     role: 'Dragon & 3D Print Lead',
@@ -48,7 +46,6 @@ const STAFF_MEMBERS: StaffAccount[] = [
   },
   {
     id: 'nicole',
-    username: 'nicole123',
     name: 'Nicole',
     icon: '🌸',
     role: 'Rainbow Loom & Mystery Blind Box Specialist',
@@ -102,13 +99,14 @@ const getStaffInCharge = (item: {
 };
 
 export default function StaffPortalPage() {
-  const { orders, updateOrderStatus, assignOrderStaff } = useCart();
+  const { orders, updateOrderStatus, assignOrderStaff, setOrderInTemporaryTrash } = useCart();
 
   // Secure Staff Login States (zero hints)
   const [usernameInput, setUsernameInput] = useState('');
   const [passwordInput, setPasswordInput] = useState('');
   const [showPassword, setShowPassword] = useState(false);
   const [loginError, setLoginError] = useState<string | null>(null);
+  const [isLoggingIn, setIsLoggingIn] = useState(false);
 
   // Authenticated State
   const [isAuthenticated, setIsAuthenticated] = useState(false);
@@ -118,36 +116,32 @@ export default function StaffPortalPage() {
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterAssignment, setFilterAssignment] = useState<'all' | 'anna' | 'kaitlyn' | 'nicole' | 'unassigned'>('all');
   const [assignmentNotice, setAssignmentNotice] = useState<string | null>(null);
+  const [showTemporaryTrash, setShowTemporaryTrash] = useState(false);
 
   // Unified Form Submit (Both Username and Password together)
-  const handleLogin = (e: React.FormEvent) => {
+  const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
-    const enteredUser = usernameInput.trim().toLowerCase();
-    const enteredPass = passwordInput.trim().toLowerCase();
+    setIsLoggingIn(true);
+    try {
+      const staffId = await authenticateStaff(usernameInput, passwordInput);
+      const matched = STAFF_MEMBERS.find((member) => member.id === staffId);
 
-    const matched = STAFF_MEMBERS.find(
-      (m) => m.username.toLowerCase() === enteredUser || m.id.toLowerCase() === enteredUser
-    );
+      if (!matched) {
+        sound.playClick();
+        setLoginError('Sign-in failed. Check your credentials or contact the administrator.');
+        return;
+      }
 
-    if (!matched) {
-      sound.playClick();
-      setLoginError('Invalid staff username. Please check your username.');
-      return;
+      sound.playFanfare();
+      setCurrentStaff(matched);
+      setIsAuthenticated(true);
+      setLoginError(null);
+      setPasswordInput('');
+      setUsernameInput('');
+      setShowPassword(false);
+    } finally {
+      setIsLoggingIn(false);
     }
-
-    if (enteredPass !== 'craft123') {
-      sound.playClick();
-      setLoginError('Incorrect password. Please try again.');
-      return;
-    }
-
-    sound.playFanfare();
-    setCurrentStaff(matched);
-    setIsAuthenticated(true);
-    setLoginError(null);
-    setPasswordInput('');
-    setUsernameInput('');
-    setShowPassword(false);
   };
 
   const handleLogout = () => {
@@ -162,6 +156,13 @@ export default function StaffPortalPage() {
   };
 
   const handleStatusChange = (orderCode: string, newStatus: PlacedOrder['status']) => {
+    const order = orders.find((ord) => ord.orderCode === orderCode);
+    if (
+      order?.status === 'Delivered' &&
+      currentStaff?.id !== 'anna' &&
+      order.assignedStaffId !== currentStaff?.id
+    ) return;
+
     if (newStatus === 'Delivered') {
       sound.playFanfare();
       setAssignmentNotice(`Order #${orderCode} delivered and moved to the Done section! ✅🎉`);
@@ -172,6 +173,22 @@ export default function StaffPortalPage() {
       setTimeout(() => setAssignmentNotice(null), 3000);
     }
     updateOrderStatus(orderCode, newStatus);
+  };
+
+  const handleTemporaryTrash = (orderCode: string, isInTemporaryTrash: boolean) => {
+    const order = orders.find((ord) => ord.orderCode === orderCode);
+    if (
+      !order ||
+      (currentStaff?.id !== 'anna' && order.assignedStaffId !== currentStaff?.id)
+    ) return;
+
+    setOrderInTemporaryTrash(orderCode, isInTemporaryTrash);
+    setAssignmentNotice(
+      isInTemporaryTrash
+        ? `Order #${orderCode} moved to temporary trash.`
+        : `Order #${orderCode} restored from temporary trash.`
+    );
+    setTimeout(() => setAssignmentNotice(null), 3500);
   };
 
   const handleAssign = (orderCode: string, newStaffId: string) => {
@@ -202,13 +219,14 @@ export default function StaffPortalPage() {
 
   // For non-Anna (Kaitlyn or Nicole), strictly filter to orders assigned to them only.
   // For Anna, start with all orders, then apply Anna's assignment filter tab.
-  const staffFilteredOrders = isAnna
+  const staffFilteredOrders = (isAnna
     ? orders.filter((o) => {
         if (filterAssignment === 'all') return true;
         if (filterAssignment === 'unassigned') return !o.assignedStaffId;
         return o.assignedStaffId === filterAssignment;
       })
-    : orders.filter((o) => o.assignedStaffId === currentStaff?.id);
+    : orders.filter((o) => o.assignedStaffId === currentStaff?.id))
+    .filter((o) => !o.isInTemporaryTrash);
 
   // Active Orders (Not Delivered)
   const activeOrders = staffFilteredOrders.filter((o) => {
@@ -218,23 +236,28 @@ export default function StaffPortalPage() {
     return true;
   });
 
-  // Done Section (Delivered Orders)
-  const doneOrders = staffFilteredOrders.filter((o) => {
+  // Completed orders and trash are visible to every signed-in staff member.
+  const doneOrders = orders.filter((o) => {
     if (o.status !== 'Delivered') return false;
+    if (o.isInTemporaryTrash) return false;
     if (filterStatus !== 'all' && filterStatus !== 'Delivered') return false;
     return true;
   });
 
+  const temporaryTrashOrders = orders.filter((o) => o.isInTemporaryTrash);
+
   const totalRevenue = staffFilteredOrders.reduce((acc, ord) => acc + ord.total, 0);
 
-  const renderOrdersTable = (ordersList: PlacedOrder[], isDoneSection: boolean) => {
+  const renderOrdersTable = (ordersList: PlacedOrder[], isDoneSection: boolean, isTrashView = false) => {
     if (ordersList.length === 0) {
       if (isDoneSection) {
         return (
           <div style={{ padding: '38px 20px', textAlign: 'center', color: 'var(--text-soft)' }}>
             <span style={{ fontSize: '2rem', display: 'block', marginBottom: '8px' }}>📦</span>
             <p style={{ margin: 0, fontSize: '0.92rem' }}>
-              No orders in the Done section yet. When an order&apos;s status is marked as <strong>Delivered 🎉</strong>, it will automatically move here!
+              {isTrashView
+                ? 'Temporary trash is empty.'
+                : <>No orders in the Done section yet. When an order&apos;s status is marked as <strong>Delivered 🎉</strong>, it will automatically move here!</>}
             </p>
           </div>
         );
@@ -294,7 +317,7 @@ export default function StaffPortalPage() {
                           border: '1px solid #86efac',
                         }}
                       >
-                        ✓ DONE
+                        {isTrashView ? '🗑 IN TEMPORARY TRASH' : '✓ DONE'}
                       </span>
                     )}
                   </td>
@@ -381,19 +404,35 @@ export default function StaffPortalPage() {
                   </td>
 
                   <td className="status-cell">
-                    <select
-                      value={ord.status}
-                      onChange={(e) =>
-                        handleStatusChange(ord.orderCode, e.target.value as PlacedOrder['status'])
-                      }
-                      className={`status-selector status-${ord.status.toLowerCase().replace(/\s+/g, '-')}`}
-                      aria-label={`Status for ${ord.orderCode}`}
-                    >
-                      <option value="Making">Making ✂️</option>
-                      <option value="Packed">Packed 📦</option>
-                      <option value="Delivering">Delivering 🚚</option>
-                      <option value="Delivered">Delivered 🎉 ({isDoneSection ? 'Done' : 'Move to Done'})</option>
-                    </select>
+                    {isTrashView ? (
+                      <span>Delivered (Temporary Trash)</span>
+                    ) : !isDoneSection || isAnna || ord.assignedStaffId === currentStaff?.id ? (
+                      <select
+                        value={ord.status}
+                        onChange={(e) =>
+                          handleStatusChange(ord.orderCode, e.target.value as PlacedOrder['status'])
+                        }
+                        className={`status-selector status-${ord.status.toLowerCase().replace(/\s+/g, '-')}`}
+                        aria-label={`Status for ${ord.orderCode}`}
+                      >
+                        <option value="Making">Making ✂️</option>
+                        <option value="Packed">Packed 📦</option>
+                        <option value="Delivering">Delivering 🚚</option>
+                        <option value="Delivered">Delivered 🎉 ({isDoneSection ? 'Done' : 'Move to Done'})</option>
+                      </select>
+                    ) : (
+                      <span className={`status-badge-pill status-${ord.status.toLowerCase()}`}>{ord.status}</span>
+                    )}
+                    {(isDoneSection || isTrashView) &&
+                      (isAnna || ord.assignedStaffId === currentStaff?.id) && (
+                        <button
+                          type="button"
+                          className="secondary-button"
+                          onClick={() => handleTemporaryTrash(ord.orderCode, !isTrashView)}
+                        >
+                          {isTrashView ? 'Restore order' : 'Move to temporary trash'}
+                        </button>
+                      )}
                   </td>
 
                   {/* Staff Assignment Column */}
@@ -496,7 +535,7 @@ export default function StaffPortalPage() {
                       border: '1px solid #86efac',
                     }}
                   >
-                    ✓ DONE
+                    {isTrashView ? '🗑 IN TRASH' : '✓ DONE'}
                   </span>
                 ) : (
                   <span
@@ -579,19 +618,36 @@ export default function StaffPortalPage() {
               <div className="mobile-card-controls">
                 <div className="mobile-control-field">
                   <label>Fulfillment Status:</label>
-                  <select
-                    value={ord.status}
-                    onChange={(e) => handleStatusChange(ord.orderCode, e.target.value as PlacedOrder['status'])}
-                    className={`status-selector status-${ord.status.toLowerCase().replace(/\s+/g, '-')}`}
-                    style={{ width: '100%', minHeight: '44px', fontSize: '0.9rem' }}
-                    aria-label={`Status for ${ord.orderCode}`}
-                  >
-                    <option value="Making">Making ✂️</option>
-                    <option value="Packed">Packed 📦</option>
-                    <option value="Delivering">Delivering 🚚</option>
-                    <option value="Delivered">Delivered 🎉 ({isDoneSection ? 'Done' : 'Move to Done'})</option>
-                  </select>
+                  {isTrashView ? (
+                    <span>Delivered (Temporary Trash)</span>
+                  ) : !isDoneSection || isAnna || ord.assignedStaffId === currentStaff?.id ? (
+                    <select
+                      value={ord.status}
+                      onChange={(e) => handleStatusChange(ord.orderCode, e.target.value as PlacedOrder['status'])}
+                      className={`status-selector status-${ord.status.toLowerCase().replace(/\s+/g, '-')}`}
+                      style={{ width: '100%', minHeight: '44px', fontSize: '0.9rem' }}
+                      aria-label={`Status for ${ord.orderCode}`}
+                    >
+                      <option value="Making">Making ✂️</option>
+                      <option value="Packed">Packed 📦</option>
+                      <option value="Delivering">Delivering 🚚</option>
+                      <option value="Delivered">Delivered 🎉 ({isDoneSection ? 'Done' : 'Move to Done'})</option>
+                    </select>
+                  ) : (
+                    <span>{ord.status}</span>
+                  )}
                 </div>
+
+                {(isDoneSection || isTrashView) &&
+                  (isAnna || ord.assignedStaffId === currentStaff?.id) && (
+                    <button
+                      type="button"
+                      className="secondary-button"
+                      onClick={() => handleTemporaryTrash(ord.orderCode, !isTrashView)}
+                    >
+                      {isTrashView ? 'Restore order' : 'Move to temporary trash'}
+                    </button>
+                  )}
 
                 <div className="mobile-control-field">
                   <label>Staff Assignment:</label>
@@ -646,7 +702,7 @@ export default function StaffPortalPage() {
             <div className="lock-icon-badge">👑</div>
             <h2>Craft Corner Team Leader &amp; Staff Portal</h2>
             <p style={{ color: 'var(--text-soft)', fontSize: '0.9rem', margin: '4px 0 18px' }}>
-              Authorized Personnel Only. Use Anna123, Kaitlyn123, or Nicole123 with the password Craft123.
+              Authorized personnel only.
             </p>
 
             <form onSubmit={handleLogin} className="staff-login-form" autoComplete="off">
@@ -721,8 +777,9 @@ export default function StaffPortalPage() {
                 type="submit"
                 className="primary-button staff-login-btn"
                 style={{ minHeight: '48px', marginTop: '16px', fontSize: '1rem', fontWeight: 800 }}
+                disabled={isLoggingIn}
               >
-                Unlock Staff Dashboard 🔑
+                {isLoggingIn ? 'Signing in...' : 'Unlock Staff Dashboard 🔑'}
               </button>
             </form>
 
@@ -760,6 +817,14 @@ export default function StaffPortalPage() {
               <Link href="/track" className="secondary-button" target="_blank">
                 Open Customer Tracker 📦
               </Link>
+              <button
+                type="button"
+                className="secondary-button"
+                onClick={() => setShowTemporaryTrash((show) => !show)}
+                aria-pressed={showTemporaryTrash}
+              >
+                {showTemporaryTrash ? 'Back to orders' : `Temporary Trash (${temporaryTrashOrders.length})`}
+              </button>
               <button
                 type="button"
                 className="secondary-button logout-btn"
@@ -861,7 +926,10 @@ export default function StaffPortalPage() {
           </div>
 
           {/* Filter Bars */}
-          <div className="staff-filter-bar" style={{ display: 'flex', flexDirection: 'column', gap: '10px' }}>
+          <div
+            className="staff-filter-bar"
+            style={{ display: showTemporaryTrash ? 'none' : 'flex', flexDirection: 'column', gap: '10px' }}
+          >
             {/* Anna's Assignment Filters */}
             {isAnna && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
@@ -896,7 +964,7 @@ export default function StaffPortalPage() {
                   { id: 'Making', label: 'Making ✂️', count: staffFilteredOrders.filter((o) => o.status === 'Making').length },
                   { id: 'Packed', label: 'Packed 📦', count: staffFilteredOrders.filter((o) => o.status === 'Packed').length },
                   { id: 'Delivering', label: 'Delivering 🚚', count: staffFilteredOrders.filter((o) => o.status === 'Delivering').length },
-                  { id: 'Delivered', label: 'Done / Delivered ✅', count: staffFilteredOrders.filter((o) => o.status === 'Delivered').length },
+                  { id: 'Delivered', label: 'Done / Delivered ✅', count: doneOrders.length },
                 ].map((st) => (
                   <button
                     key={st.id}
@@ -913,7 +981,7 @@ export default function StaffPortalPage() {
           </div>
 
           {/* Notice if non-Anna has 0 total assigned orders */}
-          {!isAnna && staffFilteredOrders.length === 0 ? (
+          {!showTemporaryTrash && !isAnna && staffFilteredOrders.length === 0 && doneOrders.length === 0 ? (
             <div
               style={{
                 background: '#ffffff',
@@ -937,7 +1005,7 @@ export default function StaffPortalPage() {
           ) : (
             <>
               {/* Section 1: Active Orders To Fulfill */}
-              {filterStatus !== 'Delivered' && (
+              {!showTemporaryTrash && filterStatus !== 'Delivered' && (
                 <div
                   className="staff-orders-section active-orders-section"
                   style={{
@@ -991,7 +1059,7 @@ export default function StaffPortalPage() {
               )}
 
               {/* Section 2: Done & Delivered Section */}
-              {(filterStatus === 'all' || filterStatus === 'Delivered') && (
+              {!showTemporaryTrash && (filterStatus === 'all' || filterStatus === 'Delivered') && (
                 <div
                   className="staff-orders-section done-orders-section"
                   style={{
@@ -1040,6 +1108,50 @@ export default function StaffPortalPage() {
                     </span>
                   </div>
                   {renderOrdersTable(doneOrders, true)}
+                </div>
+              )}
+
+              {showTemporaryTrash && (
+                <div
+                  className="staff-orders-section"
+                  style={{
+                    background: '#ffffff',
+                    border: '2px solid #d1d5db',
+                    borderRadius: 'var(--radius-lg)',
+                    boxShadow: 'var(--shadow-subtle)',
+                    overflow: 'hidden',
+                    marginTop: '18px',
+                    marginBottom: '28px',
+                  }}
+                >
+                  <div
+                    style={{
+                      background: '#f3f4f6',
+                      padding: '16px 20px',
+                      borderBottom: '2px solid #e5e7eb',
+                      display: 'flex',
+                      justifyContent: 'space-between',
+                      alignItems: 'center',
+                      flexWrap: 'wrap',
+                      gap: '10px',
+                    }}
+                  >
+                    <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                      <span style={{ fontSize: '1.6rem' }}>🗑️</span>
+                      <div>
+                        <h2 style={{ margin: 0, fontSize: '1.15rem', color: '#374151', fontWeight: 800 }}>
+                          Temporary Trash
+                        </h2>
+                        <p style={{ margin: '2px 0 0', fontSize: '0.82rem', color: '#4b5563' }}>
+                          Orders here are hidden from Done. Anna or the assigned packager can restore them.
+                        </p>
+                      </div>
+                    </div>
+                    <span style={{ fontSize: '0.8rem', fontWeight: 800, color: '#374151' }}>
+                      {temporaryTrashOrders.length} Trashed
+                    </span>
+                  </div>
+                  {renderOrdersTable(temporaryTrashOrders, true, true)}
                 </div>
               )}
             </>

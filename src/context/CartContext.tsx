@@ -38,6 +38,7 @@ export type PlacedOrder = {
   createdAt: string;
   freeSpoonGift: boolean;
   assignedStaffId?: string;
+  isInTemporaryTrash?: boolean;
 };
 
 type CartContextType = {
@@ -81,6 +82,7 @@ type CartContextType = {
   }) => PlacedOrder;
   updateOrderStatus: (orderCode: string, newStatus: PlacedOrder['status']) => void;
   assignOrderStaff: (orderCode: string, staffId: string) => void;
+  setOrderInTemporaryTrash: (orderCode: string, isInTemporaryTrash: boolean) => void;
   getOrder: (query: string) => PlacedOrder | undefined;
 };
 
@@ -494,6 +496,15 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
   };
 
+  const setOrderInTemporaryTrash = (orderCode: string, isInTemporaryTrash: boolean) => {
+    sound.playClick();
+    setOrders((prev) =>
+      prev.map((ord) =>
+        ord.orderCode === orderCode ? { ...ord, isInTemporaryTrash } : ord
+      )
+    );
+  };
+
   const getOrder = (query: string): PlacedOrder | undefined => {
     const q = query.trim().toUpperCase();
     return orders.find(
@@ -524,6 +535,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         placeOrder,
         updateOrderStatus,
         assignOrderStaff,
+        setOrderInTemporaryTrash,
         getOrder,
       }}
     >
