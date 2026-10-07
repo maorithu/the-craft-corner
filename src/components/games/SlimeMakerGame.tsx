@@ -8,27 +8,27 @@ type GlueBase = 'clear' | 'white' | 'butter' | 'marshmallow';
 type ColorDye = 'pink' | 'blue' | 'matcha' | 'gold' | 'purple';
 type ToppingType = 'jelly-cubes' | 'boba-pearls' | 'sprinkles' | 'fruit-slices' | 'marshmallow-fluff';
 
-const glueBases: Record<GlueBase, { name: string; desc: string; color: string; icon: string }> = {
-  clear: { name: 'Clear Crystal Glue', desc: 'Ultra-glossy & glassy finish', color: '#e0f7fa', icon: '💎' },
-  white: { name: 'Fluffy White Glue', desc: 'Super thick, soft & clicky', color: '#ffffff', icon: '🥛' },
-  butter: { name: 'Daiso Butter Clay Base', desc: 'Creamy, matte & spreadable', color: '#fcf2dc', icon: '🧈' },
-  marshmallow: { name: 'Marshmallow Fluff Base', desc: 'Whipped, airy & marshmallow puffy', color: '#fff0f5', icon: '🍦' },
+const glueBases: Record<GlueBase, { name: string; desc: string; color: string; shortLabel: string }> = {
+  clear: { name: 'Clear Crystal Glue', desc: 'Ultra-glossy & glassy finish', color: '#e0f7fa', shortLabel: 'Clear' },
+  white: { name: 'Fluffy White Glue', desc: 'Super thick, soft & clicky', color: '#ffffff', shortLabel: 'White' },
+  butter: { name: 'Daiso Butter Clay Base', desc: 'Creamy, matte & spreadable', color: '#fcf2dc', shortLabel: 'Butter' },
+  marshmallow: { name: 'Marshmallow Fluff Base', desc: 'Whipped, airy & marshmallow puffy', color: '#fff0f5', shortLabel: 'Fluff' },
 };
 
-const colorDyes: Record<ColorDye, { name: string; hex: string; emoji: string }> = {
-  pink: { name: 'Strawberry Berry', hex: '#ff80aa', emoji: '🍓' },
-  blue: { name: 'Ocean Aqua', hex: '#66d9ff', emoji: '🌊' },
-  matcha: { name: 'Matcha Forest', hex: '#99d98c', emoji: '🍵' },
-  gold: { name: 'Golden Honey', hex: '#ffd166', emoji: '🍯' },
-  purple: { name: 'Taro Blossom', hex: '#c77dff', emoji: '💜' },
+const colorDyes: Record<ColorDye, { name: string; hex: string; shortLabel: string }> = {
+  pink: { name: 'Strawberry Berry', hex: '#ff80aa', shortLabel: 'Pink' },
+  blue: { name: 'Ocean Aqua', hex: '#66d9ff', shortLabel: 'Blue' },
+  matcha: { name: 'Matcha Forest', hex: '#99d98c', shortLabel: 'Matcha' },
+  gold: { name: 'Golden Honey', hex: '#ffd166', shortLabel: 'Gold' },
+  purple: { name: 'Taro Blossom', hex: '#c77dff', shortLabel: 'Purple' },
 };
 
-const toppingOptions: Record<ToppingType, { name: string; emoji: string }> = {
-  'jelly-cubes': { name: 'Melamine Jelly Cubes (JC)', emoji: '🧊' },
-  'boba-pearls': { name: 'Chewy Boba Pearls', emoji: '🧋' },
-  sprinkles: { name: 'Rainbow Sparkle Glitter', emoji: '✨' },
-  'fruit-slices': { name: 'Fimo Fruit Slices', emoji: '🍓' },
-  'marshmallow-fluff': { name: 'Marshmallow Fluff Dollop (Berry & Original)', emoji: '🍦' },
+const toppingOptions: Record<ToppingType, { name: string; shortLabel: string }> = {
+  'jelly-cubes': { name: 'Melamine Jelly Cubes (JC)', shortLabel: 'JC' },
+  'boba-pearls': { name: 'Chewy Boba Pearls', shortLabel: 'Boba' },
+  sprinkles: { name: 'Rainbow Sparkle Glitter', shortLabel: 'Glitter' },
+  'fruit-slices': { name: 'Fimo Fruit Slices', shortLabel: 'Fruit' },
+  'marshmallow-fluff': { name: 'Marshmallow Fluff Dollop (Berry & Original)', shortLabel: 'Fluff' },
 };
 
 export default function SlimeMakerGame() {
@@ -122,7 +122,7 @@ export default function SlimeMakerGame() {
     <div className="mini-game-card slime-maker-game-card">
       <div className="game-card-header">
         <div className="game-title-group">
-          <span className="game-badge">🥣 Activity 02</span>
+          <span className="game-badge">Activity 02</span>
           <h3>DIY Slime-Making Studio</h3>
           <p>
             Choose your glue base, swirl vibrant color dyes, drop tactile mix-ins, pour activator, stir until stretchy, then poke and pop your custom handmade studio slime!
@@ -131,7 +131,7 @@ export default function SlimeMakerGame() {
 
         {currentStep === 5 && (
           <div className="squish-counter-badge">
-            <span>Bubble Pops: <strong>{bubblePopsCount}</strong> 🫧</span>
+            <span>Bubble Pops: <strong>{bubblePopsCount}</strong></span>
           </div>
         )}
       </div>
@@ -199,37 +199,37 @@ export default function SlimeMakerGame() {
             <div className="slime-floating-toppings">
               {selectedToppings.includes('jelly-cubes') && (
                 <>
-                  <span className="jelly-cube-particle jc-1">🧊</span>
-                  <span className="jelly-cube-particle jc-2">🧊</span>
-                  <span className="jelly-cube-particle jc-3">🧊</span>
+                  <span className="jelly-cube-particle jc-1">◈</span>
+                  <span className="jelly-cube-particle jc-2">◈</span>
+                  <span className="jelly-cube-particle jc-3">◈</span>
                 </>
               )}
               {selectedToppings.includes('boba-pearls') && (
                 <>
-                  <span className="boba-particle b-1">⚫</span>
-                  <span className="boba-particle b-2">⚫</span>
-                  <span className="boba-particle b-3">⚫</span>
+                  <span className="boba-particle b-1">◉</span>
+                  <span className="boba-particle b-2">◉</span>
+                  <span className="boba-particle b-3">◉</span>
                 </>
               )}
               {selectedToppings.includes('sprinkles') && (
                 <>
-                  <span className="sprinkle-particle s-1">✨</span>
-                  <span className="sprinkle-particle s-2">⭐</span>
-                  <span className="sprinkle-particle s-3">✨</span>
+                  <span className="sprinkle-particle s-1">✦</span>
+                  <span className="sprinkle-particle s-2">✦</span>
+                  <span className="sprinkle-particle s-3">✦</span>
                 </>
               )}
               {selectedToppings.includes('fruit-slices') && (
                 <>
-                  <span className="fruit-slice-particle f-1">🍓</span>
-                  <span className="fruit-slice-particle f-2">🍉</span>
-                  <span className="fruit-slice-particle f-3">🥝</span>
+                  <span className="fruit-slice-particle f-1">◍</span>
+                  <span className="fruit-slice-particle f-2">◍</span>
+                  <span className="fruit-slice-particle f-3">◍</span>
                 </>
               )}
               {selectedToppings.includes('marshmallow-fluff') && (
                 <>
-                  <span className="marshmallow-particle m-1">🍦</span>
-                  <span className="marshmallow-particle m-2">🍓</span>
-                  <span className="marshmallow-particle m-3">🫐</span>
+                  <span className="marshmallow-particle m-1">◌</span>
+                  <span className="marshmallow-particle m-2">◌</span>
+                  <span className="marshmallow-particle m-3">◌</span>
                 </>
               )}
             </div>
@@ -242,7 +242,7 @@ export default function SlimeMakerGame() {
                   className="slime-poke-dent"
                   style={{ left: `${dent.x}px`, top: `${dent.y}px` }}
                 >
-                  <span className="dent-bubble-ring">🫧</span>
+                  <span className="dent-bubble-ring">◌</span>
                 </div>
               ))}
 
@@ -253,14 +253,14 @@ export default function SlimeMakerGame() {
                 style={{ transform: `rotate(${spoonAngle}deg)` }}
                 onClick={handleStirClick}
               >
-                🥄
+                Spoon
               </div>
             )}
 
             {/* Step 5 Finish Floating Badge */}
             {currentStep === 5 && isStretched && (
               <div className="giant-stretch-balloon">
-                <span>💨 WHOOSH! Giant Slime Bubble! 💨</span>
+                <span>WHOOSH! Giant slime bubble stretch.</span>
               </div>
             )}
           </div>
@@ -282,7 +282,7 @@ export default function SlimeMakerGame() {
                       className={`step-choice-card ${selectedBase === key ? 'selected' : ''}`}
                       onClick={() => handlePickBase(key)}
                     >
-                      <span className="card-choice-icon">{b.icon}</span>
+                      <span className="card-choice-icon" style={{ background: b.color }}>{b.shortLabel}</span>
                       <strong>{b.name}</strong>
                       <small>{b.desc}</small>
                     </button>
@@ -295,7 +295,7 @@ export default function SlimeMakerGame() {
                   className="primary-button step-next-btn"
                   onClick={() => setCurrentStep(2)}
                 >
-                  Next: Pick Color Dye 🎨 →
+                  Next: Pick Color Dye →
                 </button>
               </div>
             </div>
@@ -316,7 +316,7 @@ export default function SlimeMakerGame() {
                       style={{ backgroundColor: c.hex }}
                       onClick={() => handlePickColor(key)}
                     >
-                      <span className="swatch-emoji">{c.emoji}</span>
+                      <span className="swatch-emoji" style={{ background: '#ffffffcc', color: '#1f2937' }}>{c.shortLabel}</span>
                       <span className="swatch-name">{c.name}</span>
                     </button>
                   );
@@ -335,7 +335,7 @@ export default function SlimeMakerGame() {
                   className="primary-button step-next-btn"
                   onClick={() => setCurrentStep(3)}
                 >
-                  Next: Add Mix-in Charms 🧊 →
+                  Next: Add Mix-in Charms →
                 </button>
               </div>
             </div>
@@ -356,7 +356,7 @@ export default function SlimeMakerGame() {
                       className={`step-choice-card ${hasIt ? 'selected' : ''}`}
                       onClick={() => handleToggleTopping(key)}
                     >
-                      <span className="card-choice-icon">{t.emoji}</span>
+                      <span className="card-choice-icon" style={{ background: 'linear-gradient(135deg, #ffffff 0%, #dfe7ff 100%)' }}>{t.shortLabel}</span>
                       <strong>{t.name}</strong>
                       <small>{hasIt ? '✓ Added in Bowl' : '+ Tap to add'}</small>
                     </button>
@@ -376,7 +376,7 @@ export default function SlimeMakerGame() {
                   className="primary-button step-next-btn"
                   onClick={() => setCurrentStep(4)}
                 >
-                  Next: Activate &amp; Stir 🥄 →
+                  Next: Activate &amp; Stir →
                 </button>
               </div>
             </div>
@@ -398,7 +398,7 @@ export default function SlimeMakerGame() {
                     className="secondary-button add-activator-btn"
                     onClick={handleAddActivator}
                   >
-                    💧 Add Activator Drop
+                    Add Activator Drop
                   </button>
                 </div>
 
@@ -420,7 +420,7 @@ export default function SlimeMakerGame() {
                   className="primary-button stir-giant-btn"
                   onClick={handleStirClick}
                 >
-                  🥄 Stir the Bowl! (Click repeatedly!)
+                  Stir the Bowl! (Click repeatedly!)
                 </button>
               </div>
             </div>
@@ -430,7 +430,7 @@ export default function SlimeMakerGame() {
           {currentStep === 5 && (
             <div className="step-options-container finish-container">
               <div className="finish-banner-tag">
-                🎉 Slime Activated &amp; Ready!
+                Slime Activated &amp; Ready!
               </div>
               <h4>Tap Anywhere on the Slime Bowl to Poke &amp; Pop!</h4>
               <p className="finish-desc">
@@ -444,21 +444,21 @@ export default function SlimeMakerGame() {
                   className="primary-button stretch-btn"
                   onClick={handleStretchSlime}
                 >
-                  💨 Pull Giant Bubble Stretch!
+                  Pull Giant Bubble Stretch
                 </button>
                 <button
                   type="button"
                   className="secondary-button"
                   onClick={handleResetSlime}
                 >
-                  🥣 Mix Another Slime
+                  Mix Another Slime
                 </button>
               </div>
 
               <div className="slimeshop-invite-box">
                 <span>Want real handmade slimes with jelly cubes &amp; boba delivered to you?</span>
                 <Link href="/slimetea" className="teleport-link-btn">
-                  Visit SlimeTea Bar 🧋 →
+                  Visit SlimeTea Bar →
                 </Link>
               </div>
             </div>

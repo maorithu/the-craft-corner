@@ -198,7 +198,7 @@ export default function BraceletMakerGame() {
           <div className="letter-input-row">
             <input
               type="text"
-              placeholder="e.g. ANNA, BESTIE"
+              placeholder="e.g. BESTIE, BFF"
               maxLength={8}
               value={letterInput}
               onChange={(e) => setLetterInput(e.target.value)}
