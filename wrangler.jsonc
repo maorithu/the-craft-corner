@@ -1,0 +1,7 @@
+{
+  "$schema": "node_modules/wrangler/config-schema.json",
+  "name": "thecraftcorner",
+  "compatibility_date": "2024-06-20",
+  "compatibility_flags": ["nodejs_compat"],
+  "pages_build_output_dir": "./out"
+}
