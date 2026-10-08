@@ -1,13 +1,10 @@
+import { getStaffByUsername, verifyStaffPassword } from '../../src/lib/db';
+
 interface StaffLoginEnv {
-  STAFF_ANNA_USERNAME?: string;
-  STAFF_ANNA_PASSWORD?: string;
-  STAFF_KAITLYN_USERNAME?: string;
-  STAFF_KAITLYN_PASSWORD?: string;
-  STAFF_NICOLE_USERNAME?: string;
-  STAFF_NICOLE_PASSWORD?: string;
+  // No legacy env-backed fallback accounts remain.
 }
 
-function jsonResponse(body: Record<string, string>, status: number): Response {
+function jsonResponse(body: Record<string, unknown>, status: number): Response {
   return new Response(JSON.stringify(body), {
     status,
     headers: {
@@ -15,6 +12,35 @@ function jsonResponse(body: Record<string, string>, status: number): Response {
       'Cache-Control': 'no-store',
     },
   });
+}
+
+function normalizeStaffUser(staffUser: { id: string; username: string; fullName: string; role: string; department?: string; departmentShort?: string; icon?: string; description?: string; colorBg?: string; colorBorder?: string; colorText?: string; permissions?: string | string[] }) {
+  let permissions: string[] = [];
+  if (typeof staffUser.permissions === 'string') {
+    try {
+      const parsed = JSON.parse(staffUser.permissions);
+      permissions = Array.isArray(parsed) ? parsed.filter((value): value is string => typeof value === 'string') : [];
+    } catch {
+      permissions = [];
+    }
+  } else if (Array.isArray(staffUser.permissions)) {
+    permissions = staffUser.permissions.filter((value): value is string => typeof value === 'string');
+  }
+
+  return {
+    id: staffUser.id,
+    username: staffUser.username,
+    name: staffUser.fullName,
+    icon: staffUser.icon || '👤',
+    role: staffUser.role || 'Staff',
+    deptName: staffUser.department || 'Operations',
+    deptShort: staffUser.departmentShort || staffUser.department || 'Operations',
+    description: staffUser.description || '',
+    colorBg: staffUser.colorBg || '#eff6ff',
+    colorBorder: staffUser.colorBorder || '#bfdbfe',
+    colorText: staffUser.colorText || '#1e3a8a',
+    permissions,
+  };
 }
 
 export async function onRequestPost({
@@ -45,20 +71,10 @@ export async function onRequestPost({
     return jsonResponse({ error: 'Invalid username or password.' }, 401);
   }
 
-  const accounts = [
-    { staffId: 'anna', username: env.STAFF_ANNA_USERNAME, password: env.STAFF_ANNA_PASSWORD },
-    { staffId: 'kaitlyn', username: env.STAFF_KAITLYN_USERNAME, password: env.STAFF_KAITLYN_PASSWORD },
-    { staffId: 'nicole', username: env.STAFF_NICOLE_USERNAME, password: env.STAFF_NICOLE_PASSWORD },
-  ];
-
-  if (accounts.some((account) => !account.username || !account.password)) {
-    return jsonResponse({ error: 'Sign-in is unavailable.' }, 503);
+  const dbStaff = getStaffByUsername(username);
+  if (dbStaff && verifyStaffPassword(password, dbStaff.passwordHash, dbStaff.passwordSalt)) {
+    return jsonResponse({ staff: normalizeStaffUser(dbStaff) }, 200);
   }
 
-  const account = accounts.find(
-    (candidate) => candidate.username!.trim().toLowerCase() === username && candidate.password === password
-  );
-
-  if (!account) return jsonResponse({ error: 'Invalid username or password.' }, 401);
-  return jsonResponse({ staffId: account.staffId }, 200);
+  return jsonResponse({ error: 'Invalid username or password.' }, 401);
 }

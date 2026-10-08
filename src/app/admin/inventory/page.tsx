@@ -1,9 +1,9 @@
 'use client';
 
-import { useState, useRef } from 'react';
+import { useState, useRef, useEffect } from 'react';
 import Link from 'next/link';
 import { useInventory, ProductItem } from '@/context/InventoryContext';
-import { authenticateStaff } from '@/lib/staffAuth';
+import { authenticateAdminStaff, getStaffDirectory } from '@/lib/staffAuth';
 import { sound } from '@/utils/soundEffects';
 
 type StaffMember = {
@@ -14,36 +14,6 @@ type StaffMember = {
   colorBg: string;
   colorBorder: string;
   colorText: string;
-};
-
-const STAFF_ADMINS: Record<string, StaffMember> = {
-  anna: {
-    id: 'anna',
-    name: 'Anna (Lead Manager)',
-    icon: '🧋',
-    dept: 'SlimeTea Studio & Pure Slimes',
-    colorBg: '#dbeafe',
-    colorBorder: '#93c5fd',
-    colorText: '#1e40af',
-  },
-  kaitlyn: {
-    id: 'kaitlyn',
-    name: 'Kaitlyn',
-    icon: '🐉',
-    dept: 'Dragons & 3D Prints',
-    colorBg: '#fef3c7',
-    colorBorder: '#fcd34d',
-    colorText: '#92400e',
-  },
-  nicole: {
-    id: 'nicole',
-    name: 'Nicole',
-    icon: '🌸',
-    dept: 'Rainbow Loom & Blind Boxes',
-    colorBg: '#fce7f3',
-    colorBorder: '#fbcfe8',
-    colorText: '#9d174d',
-  },
 };
 
 const PRESET_ICONS = ['🐉', '🧋', '🌈', '🎁', '🐱', '🦖', '🐛', '🦫', '⌨️', '🥐', '🍓', '✨', '🐾', '🍃', '⭐'];
@@ -70,8 +40,27 @@ export default function AdminInventoryPage() {
   const [password, setPassword] = useState('');
   const [isAuthenticated, setIsAuthenticated] = useState(false);
   const [currentStaff, setCurrentStaff] = useState<StaffMember | null>(null);
+  const [staffDirectory, setStaffDirectory] = useState<StaffMember[]>([]);
   const [loginError, setLoginError] = useState(false);
   const [isLoggingIn, setIsLoggingIn] = useState(false);
+
+  useEffect(() => {
+    getStaffDirectory().then((members) => {
+      if (members.length > 0) {
+        setStaffDirectory(
+          members.map((member) => ({
+            id: member.id,
+            name: member.name,
+            icon: member.icon,
+            dept: member.deptName || member.deptShort || 'Operations',
+            colorBg: member.colorBg,
+            colorBorder: member.colorBorder,
+            colorText: member.colorText,
+          }))
+        );
+      }
+    });
+  }, []);
 
   // Filters & Search
   const [searchQuery, setSearchQuery] = useState('');
@@ -94,7 +83,7 @@ export default function AdminInventoryPage() {
   const [formCategory, setFormCategory] = useState<string>('3d-prints');
   const [formCategoryLabel, setFormCategoryLabel] = useState('');
   const [formSubCategory, setFormSubCategory] = useState('all');
-  const [formStaffLead, setFormStaffLead] = useState('kaitlyn');
+  const [formStaffLead, setFormStaffLead] = useState('');
   const [formStock, setFormStock] = useState<number>(25);
   const [formTag, setFormTag] = useState('');
   const [formIcon, setFormIcon] = useState('✨');
@@ -115,17 +104,24 @@ export default function AdminInventoryPage() {
     e.preventDefault();
     setIsLoggingIn(true);
     try {
-      const staffId = await authenticateStaff(username, password);
-      const matched = staffId ? STAFF_ADMINS[staffId] : undefined;
+      const authenticatedStaff = await authenticateAdminStaff(username, password);
 
-      if (!matched) {
+      if (!authenticatedStaff) {
         sound.playClick();
         setLoginError(true);
         return;
       }
 
       sound.playFanfare();
-      setCurrentStaff(matched);
+      setCurrentStaff({
+        id: authenticatedStaff.id,
+        name: authenticatedStaff.name,
+        icon: authenticatedStaff.icon,
+        dept: authenticatedStaff.deptName,
+        colorBg: authenticatedStaff.colorBg,
+        colorBorder: authenticatedStaff.colorBorder,
+        colorText: authenticatedStaff.colorText,
+      });
       setIsAuthenticated(true);
       setLoginError(false);
       setUsername('');
@@ -146,7 +142,7 @@ export default function AdminInventoryPage() {
     setFormCategory('3d-prints');
     setFormCategoryLabel('3D Prints & Fidgets');
     setFormSubCategory('3d-prints');
-    setFormStaffLead(currentStaff?.id || 'anna');
+    setFormStaffLead(currentStaff?.id || staffDirectory[0]?.id || '');
     setFormStock(25);
     setFormTag('New Arrival');
     setFormIcon('✨');
@@ -168,7 +164,7 @@ export default function AdminInventoryPage() {
     setFormCategory(p.category);
     setFormCategoryLabel(p.categoryLabel || p.category);
     setFormSubCategory(p.subCategory || 'all');
-    setFormStaffLead(p.staffInCharge || 'anna');
+    setFormStaffLead(p.staffInCharge || currentStaff?.id || staffDirectory[0]?.id || '');
     setFormStock(p.stock !== undefined ? p.stock : 25);
     setFormTag(p.tag || '');
     setFormIcon(p.icon || '✨');
@@ -322,6 +318,9 @@ export default function AdminInventoryPage() {
         <div className="staff-lock-screen">
           <div className="staff-lock-card">
             <div className="lock-icon-badge">📦 🔒</div>
+            <div style={{ display: 'flex', justifyContent: 'flex-end', marginBottom: '8px' }}>
+              <Link href="/admin/staff" className="text-link">Manage staff →</Link>
+            </div>
             <h2>Inventory &amp; Product Database Admin</h2>
             <p>
               Please enter your staff username and password to manage inventory, products, pictures, and stock levels.
@@ -487,24 +486,14 @@ export default function AdminInventoryPage() {
               <span className="metric-label">Total Units in Stock</span>
               <strong className="metric-val">{totalStockCount}</strong>
             </div>
-            <div className="metric-box">
-              <span className="metric-label">🐉 Kaitlyn&apos;s 3D/Dragons</span>
-              <strong className="metric-val">
-                {products.filter((p) => p.staffInCharge === 'kaitlyn').length}
-              </strong>
-            </div>
-            <div className="metric-box">
-              <span className="metric-label">🧋 Anna&apos;s Slimes</span>
-              <strong className="metric-val">
-                {products.filter((p) => p.staffInCharge === 'anna').length}
-              </strong>
-            </div>
-            <div className="metric-box">
-              <span className="metric-label">🌸 Nicole&apos;s Loom &amp; Boxes</span>
-              <strong className="metric-val">
-                {products.filter((p) => p.staffInCharge === 'nicole').length}
-              </strong>
-            </div>
+            {staffDirectory.length > 0 ? staffDirectory.map((member) => (
+              <div className="metric-box" key={member.id}>
+                <span className="metric-label">{member.icon} {member.name}</span>
+                <strong className="metric-val">
+                  {products.filter((p) => p.staffInCharge === member.id).length}
+                </strong>
+              </div>
+            )) : null}
             {lowStockCount > 0 && (
               <div className="metric-box" style={{ borderColor: '#fca5a5', background: '#fff1f2' }}>
                 <span className="metric-label" style={{ color: '#be123c' }}>⚠️ Low Stock (&le; 5)</span>
@@ -556,9 +545,11 @@ export default function AdminInventoryPage() {
                   }}
                 >
                   <option value="all">All Departments</option>
-                  <option value="kaitlyn">🐉 Kaitlyn (Dragons &amp; 3D)</option>
-                  <option value="anna">🧋 Anna (Slimes &amp; SlimeTea)</option>
-                  <option value="nicole">🌸 Nicole (Loom &amp; Blind Boxes)</option>
+                  {staffDirectory.map((member) => (
+                    <option key={member.id} value={member.id}>
+                      {member.icon} {member.name}
+                    </option>
+                  ))}
                 </select>
 
                 <select
@@ -639,7 +630,7 @@ export default function AdminInventoryPage() {
                   </tr>
                 ) : (
                   filteredProducts.map((p) => {
-                    const staff = STAFF_ADMINS[p.staffInCharge || 'anna'] || STAFF_ADMINS.anna;
+                    const staff = staffDirectory.find((member) => member.id === (p.staffInCharge || currentStaff?.id || staffDirectory[0]?.id || 'staff_admin')) || staffDirectory[0] || currentStaff;
                     const stock = p.stock !== undefined ? p.stock : 25;
                     const isLow = stock <= 5;
                     const isOut = stock === 0;
@@ -993,9 +984,15 @@ export default function AdminInventoryPage() {
                         className="checkout-select"
                         style={{ width: '100%' }}
                       >
-                        <option value="kaitlyn">🐉 Kaitlyn (Dragons &amp; 3D Prints)</option>
-                        <option value="anna">🧋 Anna (SlimeTea &amp; Pure Slimes)</option>
-                        <option value="nicole">🌸 Nicole (Rainbow Loom &amp; Blind Boxes)</option>
+                        {staffDirectory.length > 0 ? staffDirectory.map((member) => (
+                          <option key={member.id} value={member.id}>
+                            {member.icon} {member.name}
+                          </option>
+                        )) : (
+                          <option value={currentStaff?.id || 'staff_admin'}>
+                            {currentStaff?.icon || '👤'} {currentStaff?.name || 'Current Staff'}
+                          </option>
+                        )}
                       </select>
                     </div>
 

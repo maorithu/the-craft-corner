@@ -16,6 +16,7 @@ export type CartItem = {
   tag?: string;
   categoryLabel?: string;
   size?: string;
+  staffInCharge?: string;
   customizationDetails?: string;
 };
 
@@ -54,6 +55,7 @@ type CartContextType = {
       tag?: string;
       categoryLabel?: string;
       size?: string;
+      staffInCharge?: string;
       customizationDetails?: string;
     },
     quantity?: number
@@ -351,6 +353,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       tag?: string;
       categoryLabel?: string;
       size?: string;
+      staffInCharge?: string;
       customizationDetails?: string;
     },
     quantity: number = 1
@@ -391,6 +394,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         tag: item.tag,
         categoryLabel: item.categoryLabel,
         size: item.size,
+        staffInCharge: item.staffInCharge,
         customizationDetails: item.customizationDetails,
       };
       setCartItems((prev) => [...prev, newItem]);

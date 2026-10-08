@@ -193,7 +193,7 @@ export default function CartDrawer() {
             <span className="cart-empty-icon">🧺</span>
             <h3>Your basket is empty</h3>
             <p>
-              Check out our <strong>$2.00 Rainbow Loom Packets</strong>, <strong>$2.50 Mystery Blind Boxes</strong>, <strong>$4.50 Squishy Blind Boxes</strong>, and SlimeTea bar!
+              Check out our <strong>$2.00 Rainbow Loom Packets</strong>, <strong>$2.50 Mystery Blind Boxes</strong>, the <strong>$4.50 Oreo Balloon</strong>, and SlimeTea bar!
             </p>
             <Link
               href="/shop"

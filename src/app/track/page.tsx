@@ -18,36 +18,13 @@ const getStaffInCharge = (item: {
   shortName?: string;
   categoryLabel?: string;
   tag?: string;
+  staffInCharge?: string;
 }) => {
-  const text = `${item.name} ${item.shortName || ''} ${item.categoryLabel || ''} ${item.tag || ''}`.toLowerCase();
-
-  if (
-    text.includes('dragon') ||
-    text.includes('puppet') ||
-    text.includes('3d') ||
-    text.includes('print') ||
-    text.includes('clicker') ||
-    text.includes('axolotl') ||
-    text.includes('capybara') ||
-    text.includes('slug') ||
-    text.includes('dino') ||
-    text.includes('egg')
-  ) {
-    return specialtyLookup.kaitlyn;
+  if (item.staffInCharge && specialtyLookup[item.staffInCharge as keyof typeof specialtyLookup]) {
+    return specialtyLookup[item.staffInCharge as keyof typeof specialtyLookup];
   }
 
-  if (
-    text.includes('slime') ||
-    text.includes('tea') ||
-    text.includes('boba') ||
-    text.includes('drink') ||
-    text.includes('fluff') ||
-    text.includes('spoon')
-  ) {
-    return specialtyLookup.anna;
-  }
-
-  return specialtyLookup.nicole;
+  return specialtyLookup.anna;
 };
 
 function TrackContent() {

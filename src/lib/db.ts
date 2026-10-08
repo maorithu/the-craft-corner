@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import fs from 'fs';
 import path from 'path';
 import { craftItems } from '@/data/items';
@@ -34,32 +35,45 @@ if (!fs.existsSync(dataDir)) {
 
 const dbPath = path.join(dataDir, 'inventory.db');
 
-function determineStaff(item: { name: string; category?: string; subCategory?: string; shortName?: string }): string {
-  const text = `${item.name} ${item.shortName || ''} ${item.category || ''} ${item.subCategory || ''}`.toLowerCase();
-  if (
-    text.includes('dragon') ||
-    text.includes('puppet') ||
-    text.includes('3d') ||
-    text.includes('print') ||
-    text.includes('clicker') ||
-    text.includes('egg') ||
-    text.includes('axolotl') ||
-    text.includes('capybara') ||
-    text.includes('dino')
-  ) {
-    return 'kaitlyn';
+export interface DbStaffUser {
+  id: string;
+  username: string;
+  passwordHash: string;
+  passwordSalt: string;
+  fullName: string;
+  role: string;
+  department: string;
+  departmentShort: string;
+  icon: string;
+  description: string;
+  colorBg: string;
+  colorBorder: string;
+  colorText: string;
+  isActive: number;
+  permissions: string;
+  createdAt: string;
+  updatedAt: string;
+}
+
+export function hashStaffPassword(password: string, salt = crypto.randomBytes(16).toString('hex')) {
+  return {
+    salt,
+    hash: crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha256').toString('hex'),
+  };
+}
+
+export function verifyStaffPassword(password: string, passwordHash: string, salt: string): boolean {
+  if (!password || !passwordHash || !salt) return false;
+
+  try {
+    const candidateHash = crypto.pbkdf2Sync(password, salt, 100000, 64, 'sha256').toString('hex');
+    return crypto.timingSafeEqual(
+      Buffer.from(candidateHash, 'hex'),
+      Buffer.from(passwordHash, 'hex')
+    );
+  } catch {
+    return false;
   }
-  if (
-    text.includes('slime') ||
-    text.includes('tea') ||
-    text.includes('boba') ||
-    text.includes('drink') ||
-    text.includes('fluff') ||
-    text.includes('spoon')
-  ) {
-    return 'anna';
-  }
-  return 'nicole';
 }
 
 let dbInstance: any = null;
@@ -100,6 +114,30 @@ function getDb() {
       );
     `);
 
+    db.exec(`
+      CREATE TABLE IF NOT EXISTS staff_users (
+        id TEXT PRIMARY KEY,
+        username TEXT NOT NULL UNIQUE,
+        passwordHash TEXT NOT NULL,
+        passwordSalt TEXT NOT NULL,
+        fullName TEXT NOT NULL,
+        role TEXT NOT NULL,
+        department TEXT,
+        departmentShort TEXT,
+        icon TEXT DEFAULT '👤',
+        description TEXT,
+        colorBg TEXT DEFAULT '#eff6ff',
+        colorBorder TEXT DEFAULT '#bfdbfe',
+        colorText TEXT DEFAULT '#1e3a8a',
+        isActive INTEGER DEFAULT 1,
+        permissions TEXT DEFAULT '[]',
+        createdAt TEXT,
+        updatedAt TEXT
+      );
+    `);
+
+    ensureDefaultStaffUsers(db);
+
     // Check if table is empty; if so, seed from craftItems
     const countRow: any = db.prepare('SELECT COUNT(*) as count FROM products').get();
     if (!countRow || countRow.count === 0) {
@@ -112,6 +150,171 @@ function getDb() {
     console.error('Failed to initialize SQLite DatabaseSync:', err);
     return null;
   }
+}
+
+function ensureDefaultStaffUsers(db: any) {
+  const rows: any = db.prepare('SELECT COUNT(*) as count FROM staff_users').get();
+  if (!rows || rows.count > 0) return;
+
+  const envEntries: Array<{ username: string; password: string; fullName: string; role: string; department: string; departmentShort: string; icon: string; description: string; colorBg: string; colorBorder: string; colorText: string }> = [];
+
+  const candidateNames = [
+    ['STAFF_DEFAULT_USERNAME', 'STAFF_DEFAULT_PASSWORD', 'Staff Admin', 'Lead Manager', 'Operations', 'Operations', '👑', 'Default staff admin account', '#dbeafe', '#93c5fd', '#1e40af'],
+    ['STAFF_ADMIN_USERNAME', 'STAFF_ADMIN_PASSWORD', 'Store Admin', 'Administrator', 'Operations', 'Admin', '🛠️', 'Store administrator account', '#fef3c7', '#fcd34d', '#92400e'],
+  ];
+
+  for (const [usernameKey, passwordKey, fullName, role, department, departmentShort, icon, description, colorBg, colorBorder, colorText] of candidateNames) {
+    const username = process.env[usernameKey];
+    const password = process.env[passwordKey];
+    if (!username || !password) continue;
+
+    envEntries.push({
+      username: username.trim().toLowerCase(),
+      password,
+      fullName,
+      role,
+      department,
+      departmentShort,
+      icon,
+      description,
+      colorBg,
+      colorBorder,
+      colorText,
+    });
+  }
+
+  if (envEntries.length === 0) return;
+
+  const insert = db.prepare(`
+    INSERT INTO staff_users (
+      id, username, passwordHash, passwordSalt, fullName, role,
+      department, departmentShort, icon, description,
+      colorBg, colorBorder, colorText, isActive, permissions,
+      createdAt, updatedAt
+    ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+  `);
+
+  const now = new Date().toISOString();
+  for (const entry of envEntries) {
+    const { hash, salt } = hashStaffPassword(entry.password);
+    insert.run(
+      `staff_${entry.username.replace(/[^a-z0-9]+/g, '_')}`,
+      entry.username,
+      hash,
+      salt,
+      entry.fullName,
+      entry.role,
+      entry.department,
+      entry.departmentShort,
+      entry.icon,
+      entry.description,
+      entry.colorBg,
+      entry.colorBorder,
+      entry.colorText,
+      1,
+      JSON.stringify(['manage_orders', 'manage_inventory', 'view_dashboard']),
+      now,
+      now
+    );
+  }
+}
+
+export function getAllStaffUsers(): DbStaffUser[] {
+  const db = getDb();
+  if (!db) return [];
+
+  const rows: any[] = db.prepare('SELECT * FROM staff_users WHERE isActive = 1 ORDER BY fullName ASC').all();
+  return rows.map((row) => ({
+    id: row.id,
+    username: row.username,
+    passwordHash: row.passwordHash,
+    passwordSalt: row.passwordSalt,
+    fullName: row.fullName,
+    role: row.role,
+    department: row.department || 'Operations',
+    departmentShort: row.departmentShort || row.department || 'Operations',
+    icon: row.icon || '👤',
+    description: row.description || '',
+    colorBg: row.colorBg || '#eff6ff',
+    colorBorder: row.colorBorder || '#bfdbfe',
+    colorText: row.colorText || '#1e3a8a',
+    isActive: Number(row.isActive) || 0,
+    permissions: row.permissions || '[]',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  }));
+}
+
+export function getStaffByUsername(username: string): DbStaffUser | null {
+  const db = getDb();
+  if (!db) return null;
+
+  const normalizedUsername = username.trim().toLowerCase();
+  const row: any = db.prepare('SELECT * FROM staff_users WHERE username = ? AND isActive = 1').get(normalizedUsername);
+  if (!row) return null;
+
+  return {
+    id: row.id,
+    username: row.username,
+    passwordHash: row.passwordHash,
+    passwordSalt: row.passwordSalt,
+    fullName: row.fullName,
+    role: row.role,
+    department: row.department || 'Operations',
+    departmentShort: row.departmentShort || row.department || 'Operations',
+    icon: row.icon || '👤',
+    description: row.description || '',
+    colorBg: row.colorBg || '#eff6ff',
+    colorBorder: row.colorBorder || '#bfdbfe',
+    colorText: row.colorText || '#1e3a8a',
+    isActive: Number(row.isActive) || 0,
+    permissions: row.permissions || '[]',
+    createdAt: row.createdAt,
+    updatedAt: row.updatedAt,
+  };
+}
+
+export function createStaffUser(input: Partial<DbStaffUser> & { password: string; username: string; fullName: string; role?: string; department?: string; departmentShort?: string; }): DbStaffUser | null {
+  const db = getDb();
+  if (!db) return null;
+
+  const username = input.username.trim().toLowerCase();
+  const now = new Date().toISOString();
+  const { hash, salt } = hashStaffPassword(input.password);
+  const id = input.id || `staff_${username.replace(/[^a-z0-9]+/g, '_')}`;
+
+  try {
+    db.prepare(`
+      INSERT INTO staff_users (
+        id, username, passwordHash, passwordSalt, fullName, role,
+        department, departmentShort, icon, description,
+        colorBg, colorBorder, colorText, isActive, permissions,
+        createdAt, updatedAt
+      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+    `).run(
+      id,
+      username,
+      hash,
+      salt,
+      input.fullName,
+      input.role || 'Staff',
+      input.department || 'Operations',
+      input.departmentShort || input.department || 'Operations',
+      input.icon || '👤',
+      input.description || '',
+      input.colorBg || '#eff6ff',
+      input.colorBorder || '#bfdbfe',
+      input.colorText || '#1e3a8a',
+      1,
+      JSON.stringify(input.permissions ? (Array.isArray(input.permissions) ? input.permissions : [input.permissions]) : []),
+      now,
+      now
+    );
+  } catch {
+    return null;
+  }
+
+  return getStaffByUsername(username);
 }
 
 function seedProducts(db: any) {
@@ -133,7 +336,7 @@ function seedProducts(db: any) {
 
   for (const it of craftItems) {
     const priceNum = parseFloat(it.displayPrice.replace(/[^0-9.]/g, '')) || 0;
-    const staff = determineStaff(it);
+      const staff = (it as any).staffInCharge || '';
     insert.run(
       String(it.id),
       it.itemNumber || `Item ${it.id}`,
@@ -205,7 +408,7 @@ export function getAllProducts(): DbProduct[] {
   if (!db) {
     return craftItems.map((it) => ({
       ...it,
-      staffInCharge: determineStaff(it),
+      staffInCharge: it.staffInCharge || '',
       stock: 25,
       price: parseFloat(it.displayPrice.replace(/[^0-9.]/g, '')) || 0,
     }));
@@ -228,7 +431,7 @@ export function addProduct(item: Partial<DbProduct>): DbProduct {
   const now = new Date().toISOString();
   const priceNum = typeof item.price === 'number' ? item.price : parseFloat(String(item.displayPrice || '0').replace(/[^0-9.]/g, '')) || 0;
   const displayPrice = item.displayPrice || `$${priceNum.toFixed(2)}`;
-  const staff = item.staffInCharge || determineStaff({ name: item.name || '', category: item.category, subCategory: item.subCategory });
+  const staff = item.staffInCharge || '';
 
   if (db) {
     const insert = db.prepare(`

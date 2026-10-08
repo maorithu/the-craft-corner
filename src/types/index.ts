@@ -11,6 +11,7 @@ export type SubCategory =
   | 'seasonal-loom'
   | 'wearable'
   | 'blind-box'
+  | 'oreo-balloon'
   | 'squishy-blind-box'
   | '3d-animals'
   | '3d-fidgets'
@@ -27,6 +28,7 @@ export type CraftItem = {
   categoryLabel: string;
   subCategory: SubCategory;
   subCategoryLabel: string;
+  staffInCharge?: string;
   tag: string;
   accent: 'brioche' | 'matcha' | 'terracotta' | 'butter' | 'walnut' | 'oat';
   icon: string;

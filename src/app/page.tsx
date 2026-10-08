@@ -99,7 +99,7 @@ export default function HomePage() {
               <span className="dept-badge">Loom &amp; Gift Shop</span>
             </div>
             <h3>Rainbow Loom &amp; Blind Boxes</h3>
-            <p>Beach, Galaxy &amp; Minecraft kits ($2.00) plus mystery squishy blind boxes ($2.50).</p>
+            <p>Beach, Galaxy &amp; Minecraft kits ($2.00) plus mystery blind boxes and the Oreo balloon ($4.50).</p>
             <span className="dept-link-label">Browse Loom &amp; Boxes →</span>
           </Link>
         </div>

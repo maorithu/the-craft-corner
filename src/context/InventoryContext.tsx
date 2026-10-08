@@ -44,38 +44,10 @@ const InventoryContext = createContext<InventoryContextType | undefined>(undefin
 
 const LOCAL_STORAGE_KEY = 'craft_corner_inventory';
 
-function determineStaff(item: { name: string; category?: string; subCategory?: string; shortName?: string }): string {
-  const text = `${item.name} ${item.shortName || ''} ${item.category || ''} ${item.subCategory || ''}`.toLowerCase();
-  if (
-    text.includes('dragon') ||
-    text.includes('puppet') ||
-    text.includes('3d') ||
-    text.includes('print') ||
-    text.includes('clicker') ||
-    text.includes('egg') ||
-    text.includes('axolotl') ||
-    text.includes('capybara') ||
-    text.includes('dino')
-  ) {
-    return 'kaitlyn';
-  }
-  if (
-    text.includes('slime') ||
-    text.includes('tea') ||
-    text.includes('boba') ||
-    text.includes('drink') ||
-    text.includes('fluff') ||
-    text.includes('spoon')
-  ) {
-    return 'anna';
-  }
-  return 'nicole';
-}
-
 function getDefaultProducts(): ProductItem[] {
   return craftItems.map((it) => ({
     ...it,
-    staffInCharge: determineStaff(it),
+    staffInCharge: it.staffInCharge || '',
     stock: 25,
     price: parseFloat(it.displayPrice.replace(/[^0-9.]/g, '')) || 0,
   }));
@@ -154,7 +126,7 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       categoryLabel: item.categoryLabel || item.category || '3D Prints & Fidgets',
       subCategory: (item.subCategory as SubCategory) || 'all',
       subCategoryLabel: item.subCategoryLabel || '',
-      staffInCharge: item.staffInCharge || determineStaff({ name: item.name || '', category: item.category, subCategory: item.subCategory }),
+      staffInCharge: item.staffInCharge || '',
       stock: item.stock !== undefined ? Number(item.stock) : 25,
       price: priceNum,
       displayPrice: formattedPrice,

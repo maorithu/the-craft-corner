@@ -1,14 +1,14 @@
 'use client';
 
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import Link from 'next/link';
 import { useCart, PlacedOrder } from '@/context/CartContext';
-import { authenticateStaff } from '@/lib/staffAuth';
+import { authenticateStaff, getStaffDirectory } from '@/lib/staffAuth';
 import { sound } from '@/utils/soundEffects';
 
 type StaffAccount = {
-  id: string; // 'anna' | 'kaitlyn' | 'nicole'
-  name: string; // 'Anna' | 'Kaitlyn' | 'Nicole'
+  id: string;
+  name: string;
   icon: string;
   role: string;
   deptName: string;
@@ -17,6 +17,7 @@ type StaffAccount = {
   colorBg: string;
   colorBorder: string;
   colorText: string;
+  permissions?: string[];
 };
 
 const STAFF_MEMBERS: StaffAccount[] = [
@@ -63,39 +64,14 @@ const getStaffInCharge = (item: {
   shortName?: string;
   categoryLabel?: string;
   tag?: string;
+  staffInCharge?: string;
 }): StaffAccount => {
-  const text = `${item.name} ${item.shortName || ''} ${item.categoryLabel || ''} ${item.tag || ''}`.toLowerCase();
-
-  // 1. Kaitlyn: In charge of Dragon, Puppets, 3D Prints, Clickers, Eggs
-  if (
-    text.includes('dragon') ||
-    text.includes('puppet') ||
-    text.includes('3d') ||
-    text.includes('print') ||
-    text.includes('clicker') ||
-    text.includes('axolotl') ||
-    text.includes('capybara') ||
-    text.includes('slug') ||
-    text.includes('dino') ||
-    text.includes('egg')
-  ) {
-    return STAFF_MEMBERS[1]; // Kaitlyn
+  if (item.staffInCharge) {
+    const byId = STAFF_MEMBERS.find((member) => member.id === item.staffInCharge);
+    if (byId) return byId;
   }
 
-  // 2. Anna: In charge of Slimes, SlimeTea, Boba Drinks, Mystery Spoon
-  if (
-    text.includes('slime') ||
-    text.includes('tea') ||
-    text.includes('boba') ||
-    text.includes('drink') ||
-    text.includes('fluff') ||
-    text.includes('spoon')
-  ) {
-    return STAFF_MEMBERS[0]; // Anna
-  }
-
-  // 3. Nicole: In charge of Rainbow Loom, Bracelets, Blind Boxes, Squishies
-  return STAFF_MEMBERS[2]; // Nicole
+  return STAFF_MEMBERS[0];
 };
 
 export default function StaffPortalPage() {
@@ -114,23 +90,46 @@ export default function StaffPortalPage() {
 
   // Filters
   const [filterStatus, setFilterStatus] = useState<string>('all');
-  const [filterAssignment, setFilterAssignment] = useState<'all' | 'anna' | 'kaitlyn' | 'nicole' | 'unassigned'>('all');
+  const [filterAssignment, setFilterAssignment] = useState<string>('all');
   const [assignmentNotice, setAssignmentNotice] = useState<string | null>(null);
   const [showTemporaryTrash, setShowTemporaryTrash] = useState(false);
+  const [staffMembers, setStaffMembers] = useState<StaffAccount[]>(STAFF_MEMBERS);
+
+  useEffect(() => {
+    getStaffDirectory().then((members) => {
+      if (members.length > 0) {
+        setStaffMembers(members as StaffAccount[]);
+      }
+    });
+  }, []);
 
   // Unified Form Submit (Both Username and Password together)
   const handleLogin = async (e: React.FormEvent) => {
     e.preventDefault();
     setIsLoggingIn(true);
     try {
-      const staffId = await authenticateStaff(usernameInput, passwordInput);
-      const matched = STAFF_MEMBERS.find((member) => member.id === staffId);
+      const authenticatedStaff = await authenticateStaff(usernameInput, passwordInput);
 
-      if (!matched) {
+      if (!authenticatedStaff) {
         sound.playClick();
         setLoginError('Sign-in failed. Check your credentials or contact the administrator.');
         return;
       }
+
+      const matched = staffMembers.find((member) => member.id === authenticatedStaff.id)
+        || {
+          id: authenticatedStaff.id,
+          name: authenticatedStaff.name,
+          icon: authenticatedStaff.icon,
+          role: authenticatedStaff.role,
+          deptName: authenticatedStaff.deptName,
+          deptShort: authenticatedStaff.deptShort,
+          description: authenticatedStaff.description,
+          colorBg: authenticatedStaff.colorBg,
+          colorBorder: authenticatedStaff.colorBorder,
+          colorText: authenticatedStaff.colorText,
+          permissions: authenticatedStaff.permissions || [],
+        };
 
       sound.playFanfare();
       setCurrentStaff(matched);
@@ -155,11 +154,23 @@ export default function StaffPortalPage() {
     setFilterAssignment('all');
   };
 
+  const canManageStaffOrders = !!currentStaff && (
+    (currentStaff.permissions && currentStaff.permissions.some((permission) => permission === 'manage_orders' || permission === 'manage_assignments' || permission === 'view_all_orders')) ||
+    currentStaff.role.toLowerCase().includes('manager') ||
+    currentStaff.role.toLowerCase().includes('admin')
+  );
+
+  const canManageAssignments = !!currentStaff && (
+    (currentStaff.permissions && currentStaff.permissions.some((permission) => permission === 'manage_assignments' || permission === 'manage_orders')) ||
+    currentStaff.role.toLowerCase().includes('manager') ||
+    currentStaff.role.toLowerCase().includes('admin')
+  );
+
   const handleStatusChange = (orderCode: string, newStatus: PlacedOrder['status']) => {
     const order = orders.find((ord) => ord.orderCode === orderCode);
     if (
       order?.status === 'Delivered' &&
-      currentStaff?.id !== 'anna' &&
+      !canManageStaffOrders &&
       order.assignedStaffId !== currentStaff?.id
     ) return;
 
@@ -177,10 +188,7 @@ export default function StaffPortalPage() {
 
   const handleTemporaryTrash = (orderCode: string, isInTemporaryTrash: boolean) => {
     const order = orders.find((ord) => ord.orderCode === orderCode);
-    if (
-      !order ||
-      (currentStaff?.id !== 'anna' && order.assignedStaffId !== currentStaff?.id)
-    ) return;
+    if (!order || (!canManageStaffOrders && order.assignedStaffId !== currentStaff?.id)) return;
 
     setOrderInTemporaryTrash(orderCode, isInTemporaryTrash);
     setAssignmentNotice(
@@ -193,21 +201,11 @@ export default function StaffPortalPage() {
 
   const handleAssign = (orderCode: string, newStaffId: string) => {
     assignOrderStaff(orderCode, newStaffId);
-    if (newStaffId === 'nicole') {
+    const assignedStaff = staffMembers.find((member) => member.id === newStaffId);
+
+    if (assignedStaff) {
       sound.playFanfare();
-      setAssignmentNotice(
-        `Order #${orderCode} assigned to Nicole! It now appears in Nicole's account only.`
-      );
-    } else if (newStaffId === 'kaitlyn') {
-      sound.playFanfare();
-      setAssignmentNotice(
-        `Order #${orderCode} assigned to Kaitlyn! It now appears in Kaitlyn's account only.`
-      );
-    } else if (newStaffId === 'anna') {
-      sound.playFanfare();
-      setAssignmentNotice(
-        `Order #${orderCode} assigned to Anna (Myself)! It stays in your account.`
-      );
+      setAssignmentNotice(`Order #${orderCode} assigned to ${assignedStaff.name}.`);
     } else {
       sound.playClick();
       setAssignmentNotice(`Order #${orderCode} unassigned.`);
@@ -215,11 +213,9 @@ export default function StaffPortalPage() {
     setTimeout(() => setAssignmentNotice(null), 3500);
   };
 
-  const isAnna = currentStaff?.id === 'anna';
-
-  // For non-Anna (Kaitlyn or Nicole), strictly filter to orders assigned to them only.
-  // For Anna, start with all orders, then apply Anna's assignment filter tab.
-  const staffFilteredOrders = (isAnna
+  // Staff with permission to view all orders can browse the complete queue and assignment filters.
+  // Others only see the orders assigned to them.
+  const staffFilteredOrders = (canManageStaffOrders
     ? orders.filter((o) => {
         if (filterAssignment === 'all') return true;
         if (filterAssignment === 'unassigned') return !o.assignedStaffId;
@@ -406,7 +402,7 @@ export default function StaffPortalPage() {
                   <td className="status-cell">
                     {isTrashView ? (
                       <span>Delivered (Temporary Trash)</span>
-                    ) : !isDoneSection || isAnna || ord.assignedStaffId === currentStaff?.id ? (
+                    ) : !isDoneSection || canManageStaffOrders || ord.assignedStaffId === currentStaff?.id ? (
                       <select
                         value={ord.status}
                         onChange={(e) =>
@@ -424,7 +420,7 @@ export default function StaffPortalPage() {
                       <span className={`status-badge-pill status-${ord.status.toLowerCase()}`}>{ord.status}</span>
                     )}
                     {(isDoneSection || isTrashView) &&
-                      (isAnna || ord.assignedStaffId === currentStaff?.id) && (
+                      (canManageStaffOrders || ord.assignedStaffId === currentStaff?.id) && (
                         <button
                           type="button"
                           className="secondary-button"
@@ -437,7 +433,7 @@ export default function StaffPortalPage() {
 
                   {/* Staff Assignment Column */}
                   <td className="assignment-cell" style={{ minWidth: '190px' }}>
-                    {isAnna ? (
+                    {canManageAssignments ? (
                       <div style={{ display: 'flex', flexDirection: 'column', gap: '6px' }}>
                         <select
                           value={ord.assignedStaffId || ''}
@@ -448,9 +444,11 @@ export default function StaffPortalPage() {
                           aria-label="Assign order to staff"
                         >
                           <option value="">⚪ Unassigned (Select staff)</option>
-                          <option value="anna">🧋 Anna (Myself)</option>
-                          <option value="kaitlyn">🐉 Kaitlyn</option>
-                          <option value="nicole">🌸 Nicole</option>
+                          {staffMembers.map((member) => (
+                            <option key={member.id} value={member.id}>
+                              {member.icon} {member.name}
+                            </option>
+                          ))}
                         </select>
 
                         {ord.assignedStaffId && (
@@ -620,7 +618,7 @@ export default function StaffPortalPage() {
                   <label>Fulfillment Status:</label>
                   {isTrashView ? (
                     <span>Delivered (Temporary Trash)</span>
-                  ) : !isDoneSection || isAnna || ord.assignedStaffId === currentStaff?.id ? (
+                  ) : !isDoneSection || canManageStaffOrders || ord.assignedStaffId === currentStaff?.id ? (
                     <select
                       value={ord.status}
                       onChange={(e) => handleStatusChange(ord.orderCode, e.target.value as PlacedOrder['status'])}
@@ -639,7 +637,7 @@ export default function StaffPortalPage() {
                 </div>
 
                 {(isDoneSection || isTrashView) &&
-                  (isAnna || ord.assignedStaffId === currentStaff?.id) && (
+                  (canManageStaffOrders || ord.assignedStaffId === currentStaff?.id) && (
                     <button
                       type="button"
                       className="secondary-button"
@@ -651,7 +649,7 @@ export default function StaffPortalPage() {
 
                 <div className="mobile-control-field">
                   <label>Staff Assignment:</label>
-                  {isAnna ? (
+                  {canManageAssignments ? (
                     <select
                       value={ord.assignedStaffId || ''}
                       onChange={(e) => handleAssign(ord.orderCode, e.target.value)}
@@ -660,9 +658,11 @@ export default function StaffPortalPage() {
                       aria-label={`Assign order ${ord.orderCode}`}
                     >
                       <option value="">⚪ Unassigned (Select staff)</option>
-                      <option value="anna">🧋 Anna (Myself)</option>
-                      <option value="kaitlyn">🐉 Kaitlyn</option>
-                      <option value="nicole">🌸 Nicole</option>
+                      {staffMembers.map((member) => (
+                        <option key={member.id} value={member.id}>
+                          {member.icon} {member.name}
+                        </option>
+                      ))}
                     </select>
                   ) : (
                     <span
@@ -807,8 +807,8 @@ export default function StaffPortalPage() {
               <h1>Customer Orders &amp; Fulfillment Hub</h1>
               <p>
                 Welcome back, <strong>{currentStaff?.name}</strong>!{' '}
-                {isAnna
-                  ? 'Lead Manager Portal: Assign incoming customer orders to Nicole, Kaitlyn, or yourself.'
+                {canManageAssignments
+                  ? 'Staff management portal: assign incoming orders to other staff as needed.'
                   : `Viewing orders assigned to your account for fulfillment.`}
               </p>
             </div>
@@ -835,8 +835,8 @@ export default function StaffPortalPage() {
             </div>
           </div>
 
-          {/* Anna's Lead Manager Order Assignment Banner */}
-          {isAnna && (
+          {/* Assignment Controls Banner */}
+          {canManageAssignments && (
             <div
               style={{
                 background: 'linear-gradient(135deg, #eff6ff 0%, #dbeafe 100%)',
@@ -855,10 +855,10 @@ export default function StaffPortalPage() {
                 <span style={{ fontSize: '1.8rem' }}>👑</span>
                 <div>
                   <strong style={{ color: '#1e40af', fontSize: '1rem', display: 'block' }}>
-                    Anna&apos;s Lead Manager Assignment Controls
+                    Staff Assignment Controls
                   </strong>
                   <p style={{ margin: '2px 0 0', fontSize: '0.84rem', color: '#1e3a8a' }}>
-                    Assign each order using the dropdown on the side with the three names. When assigned to <strong>Nicole</strong>, it goes to Nicole&apos;s account only. When assigned to <strong>Kaitlyn</strong>, it goes to Kaitlyn&apos;s account only. When assigned to <strong>Anna (Myself)</strong>, it stays in your account.
+                    Assign each order using the dropdown on the side. Staff with the right permissions can view the full queue and move orders between team members.
                   </p>
                 </div>
               </div>
@@ -874,7 +874,7 @@ export default function StaffPortalPage() {
                   whiteSpace: 'nowrap',
                 }}
               >
-                👑 ANNA: LEAD MANAGER
+                👑 TEAM MANAGER
               </span>
             </div>
           )}
@@ -904,7 +904,7 @@ export default function StaffPortalPage() {
           {/* Quick Metrics Bar */}
           <div className="staff-metrics-grid">
             <div className="metric-box">
-              <span className="metric-label">{isAnna ? 'Total Studio Orders' : 'My Assigned Orders'}</span>
+              <span className="metric-label">{canManageStaffOrders ? 'Total Studio Orders' : 'My Assigned Orders'}</span>
               <strong className="metric-val">{staffFilteredOrders.length}</strong>
             </div>
             <div className="metric-box">
@@ -931,15 +931,17 @@ export default function StaffPortalPage() {
             style={{ display: showTemporaryTrash ? 'none' : 'flex', flexDirection: 'column', gap: '10px' }}
           >
             {/* Anna's Assignment Filters */}
-            {isAnna && (
+            {canManageAssignments && (
               <div style={{ display: 'flex', alignItems: 'center', gap: '12px', flexWrap: 'wrap' }}>
                 <span style={{ fontWeight: 700, fontSize: '0.86rem' }}>Account View:</span>
                 <div className="status-filter-pills">
                   {[
                     { id: 'all', label: 'All Orders', count: orders.length },
-                    { id: 'anna', label: '🧋 Assigned to Anna (Myself)', count: orders.filter((o) => o.assignedStaffId === 'anna').length },
-                    { id: 'kaitlyn', label: '🐉 Assigned to Kaitlyn', count: orders.filter((o) => o.assignedStaffId === 'kaitlyn').length },
-                    { id: 'nicole', label: '🌸 Assigned to Nicole', count: orders.filter((o) => o.assignedStaffId === 'nicole').length },
+                    ...staffMembers.map((member) => ({
+                      id: member.id,
+                      label: `${member.icon} Assigned to ${member.name}`,
+                      count: orders.filter((o) => o.assignedStaffId === member.id).length,
+                    })),
                     { id: 'unassigned', label: '⚪ Unassigned', count: orders.filter((o) => !o.assignedStaffId).length },
                   ].map((tab) => (
                     <button
@@ -980,8 +982,8 @@ export default function StaffPortalPage() {
             </div>
           </div>
 
-          {/* Notice if non-Anna has 0 total assigned orders */}
-          {!showTemporaryTrash && !isAnna && staffFilteredOrders.length === 0 && doneOrders.length === 0 ? (
+          {/* Notice if a staff member has 0 total assigned orders */}
+          {!showTemporaryTrash && !canManageStaffOrders && staffFilteredOrders.length === 0 && doneOrders.length === 0 ? (
             <div
               style={{
                 background: '#ffffff',
@@ -999,7 +1001,7 @@ export default function StaffPortalPage() {
                 No Orders Assigned to {currentStaff?.name} Yet
               </h3>
               <p style={{ margin: 0, color: 'var(--text-soft)', fontSize: '0.92rem' }}>
-                Anna will assign customer orders to your account. When assigned, they will appear here!
+                A manager can assign customer orders to your account. When assigned, they will appear here!
               </p>
             </div>
           ) : (

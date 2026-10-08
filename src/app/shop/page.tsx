@@ -75,7 +75,7 @@ function ShopContent() {
     if (selectedCategory === 'blind-boxes') {
       return [
         { id: 'all', label: 'All Mystery Blind Boxes' },
-        { id: 'squishy-blind-box', label: '🍡 Squishy Blind Boxes ($4.50)' },
+        { id: 'oreo-balloon', label: '🧁 Oreo Balloon ($4.50)' },
         { id: 'blind-box', label: '🌈 Loom Blind Boxes ($2.50)' },
         { id: '3d-prints', label: '🥚 3D Dragon Eggs' },
       ];
@@ -167,7 +167,7 @@ function ShopContent() {
         <p>
           {selectedCategory === '3d-prints' && 'Articulated crystal dragons, flexi animals, capybaras, and tactile 3D fidgets!'}
           {selectedCategory === 'bracelets' && 'Handmade wearable bracelets and DIY rainbow loom packets ($2.00)!'}
-          {selectedCategory === 'blind-boxes' && 'Mystery surprise boxes with sealed loom packets ($2.50) and squishy toys ($4.50)!'}
+          {selectedCategory === 'blind-boxes' && 'Mystery surprise boxes with sealed loom packets ($2.50) and the Oreo balloon ($4.50)!'}
           {selectedCategory === 'clickers' && 'Mechanical key switch clickers with cat paw keychains and handmade dragon hand puppets!'}
         </p>
 
