@@ -28,12 +28,23 @@ export interface DbProduct {
   updatedAt?: string;
 }
 
-const dataDir = path.join(process.cwd(), 'data');
-if (!fs.existsSync(dataDir)) {
-  fs.mkdirSync(dataDir, { recursive: true });
-}
+const isFilesystemAvailable = Boolean(fs && typeof fs.existsSync === 'function' && typeof fs.mkdirSync === 'function');
 
-const dbPath = path.join(dataDir, 'inventory.db');
+const dbPath = (() => {
+  if (!isFilesystemAvailable) {
+    return ':memory:';
+  }
+
+  try {
+    const dataDir = path.join(process.cwd(), 'data');
+    if (!fs.existsSync(dataDir)) {
+      fs.mkdirSync(dataDir, { recursive: true });
+    }
+    return path.join(dataDir, 'inventory.db');
+  } catch {
+    return ':memory:';
+  }
+})();
 
 export interface DbStaffUser {
   id: string;
