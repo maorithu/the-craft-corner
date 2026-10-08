@@ -12,12 +12,6 @@
 			"database_name": "thecraftcorner-db",
 			"database_id": "aef4dcce-fa6f-45e2-8e86-46dc6823d19b",
 			"remote": true
-		},
-		{
-			"binding": "thecraftcorner_db",
-			"database_name": "thecraftcorner-db",
-			"database_id": "aef4dcce-fa6f-45e2-8e86-46dc6823d19b",
-			"remote": true
 		}
 	]
 }

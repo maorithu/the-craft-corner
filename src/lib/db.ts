@@ -40,10 +40,17 @@ type D1DatabaseLike = {
   exec: (query: string) => Promise<any>;
 };
 
-type CloudflareEnv = { DB?: D1DatabaseLike };
+type CloudflareEnv = {
+  DB?: D1DatabaseLike;
+};
 
 function isD1Database(value: unknown): value is D1DatabaseLike {
   return !!value && typeof value === 'object' && 'prepare' in value && typeof (value as any).prepare === 'function';
+}
+
+function resolveD1Binding(env?: CloudflareEnv): D1DatabaseLike | undefined {
+  if (isD1Database(env?.DB)) return env.DB;
+  return undefined;
 }
 
 const isFilesystemAvailable = Boolean(fs && typeof fs.existsSync === 'function' && typeof fs.mkdirSync === 'function');
@@ -159,7 +166,7 @@ export function verifyStaffPassword(password: string, passwordHash: string, salt
 let dbInstance: any = null;
 
 async function getDb(env?: CloudflareEnv) {
-  const d1Db = env?.DB;
+  const d1Db = resolveD1Binding(env);
   if (isD1Database(d1Db)) {
     await ensureD1Schema(d1Db);
     return d1Db;
