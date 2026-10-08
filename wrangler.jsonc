@@ -1,7 +1,23 @@
 {
-  "$schema": "node_modules/wrangler/config-schema.json",
-  "name": "thecraftcorner",
-  "compatibility_date": "2024-09-23",
-  "compatibility_flags": ["nodejs_compat"],
-  "pages_build_output_dir": "./out"
+	"$schema": "node_modules/wrangler/config-schema.json",
+	"name": "thecraftcorner",
+	"compatibility_date": "2024-09-23",
+	"compatibility_flags": [
+		"nodejs_compat"
+	],
+	"pages_build_output_dir": "./out",
+	"d1_databases": [
+		{
+			"binding": "DB",
+			"database_name": "thecraftcorner-db",
+			"database_id": "aef4dcce-fa6f-45e2-8e86-46dc6823d19b",
+			"remote": true
+		},
+		{
+			"binding": "thecraftcorner_db",
+			"database_name": "thecraftcorner-db",
+			"database_id": "aef4dcce-fa6f-45e2-8e86-46dc6823d19b",
+			"remote": true
+		}
+	]
 }

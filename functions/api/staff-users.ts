@@ -43,8 +43,8 @@ function formatStaffUser(staffUser: {
   };
 }
 
-export async function onRequestGet(): Promise<Response> {
-  const staffUsers = getAllStaffUsers();
+export async function onRequestGet({ env }: { env?: { DB?: any } } = {}): Promise<Response> {
+  const staffUsers = await getAllStaffUsers(env);
 
   return new Response(JSON.stringify({ staff: staffUsers.map(formatStaffUser) }), {
     status: 200,

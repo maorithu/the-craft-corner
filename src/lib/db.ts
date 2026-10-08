@@ -28,6 +28,24 @@ export interface DbProduct {
   updatedAt?: string;
 }
 
+type D1PreparedStatement = {
+  bind: (...args: any[]) => D1PreparedStatement;
+  first: () => Promise<any>;
+  all: () => Promise<any>;
+  run: () => Promise<any>;
+};
+
+type D1DatabaseLike = {
+  prepare: (query: string) => D1PreparedStatement;
+  exec: (query: string) => Promise<any>;
+};
+
+type CloudflareEnv = { DB?: D1DatabaseLike };
+
+function isD1Database(value: unknown): value is D1DatabaseLike {
+  return !!value && typeof value === 'object' && 'prepare' in value && typeof (value as any).prepare === 'function';
+}
+
 const isFilesystemAvailable = Boolean(fs && typeof fs.existsSync === 'function' && typeof fs.mkdirSync === 'function');
 
 const dbPath = (() => {
@@ -45,6 +63,57 @@ const dbPath = (() => {
     return ':memory:';
   }
 })();
+
+async function ensureD1Schema(db: D1DatabaseLike) {
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS products (
+      id TEXT PRIMARY KEY,
+      itemNumber TEXT,
+      name TEXT NOT NULL,
+      shortName TEXT,
+      category TEXT NOT NULL,
+      categoryLabel TEXT,
+      subCategory TEXT,
+      subCategoryLabel TEXT,
+      staffInCharge TEXT,
+      stock INTEGER DEFAULT 25,
+      price REAL DEFAULT 0,
+      displayPrice TEXT,
+      tag TEXT,
+      accent TEXT DEFAULT 'butter',
+      icon TEXT DEFAULT '✨',
+      imageUrl TEXT,
+      description TEXT,
+      materials TEXT,
+      isBlindBox INTEGER DEFAULT 0,
+      sizes TEXT,
+      createdAt TEXT,
+      updatedAt TEXT
+    );
+  `);
+
+  await db.exec(`
+    CREATE TABLE IF NOT EXISTS staff_users (
+      id TEXT PRIMARY KEY,
+      username TEXT NOT NULL UNIQUE,
+      passwordHash TEXT NOT NULL,
+      passwordSalt TEXT NOT NULL,
+      fullName TEXT NOT NULL,
+      role TEXT NOT NULL,
+      department TEXT,
+      departmentShort TEXT,
+      icon TEXT DEFAULT '👤',
+      description TEXT,
+      colorBg TEXT DEFAULT '#eff6ff',
+      colorBorder TEXT DEFAULT '#bfdbfe',
+      colorText TEXT DEFAULT '#1e3a8a',
+      isActive INTEGER DEFAULT 1,
+      permissions TEXT DEFAULT '[]',
+      createdAt TEXT,
+      updatedAt TEXT
+    );
+  `);
+}
 
 export interface DbStaffUser {
   id: string;
@@ -89,7 +158,13 @@ export function verifyStaffPassword(password: string, passwordHash: string, salt
 
 let dbInstance: any = null;
 
-function getDb() {
+async function getDb(env?: CloudflareEnv) {
+  const d1Db = env?.DB;
+  if (isD1Database(d1Db)) {
+    await ensureD1Schema(d1Db);
+    return d1Db;
+  }
+
   if (dbInstance) return dbInstance;
 
   try {
@@ -97,7 +172,6 @@ function getDb() {
     const { DatabaseSync } = require('node:sqlite');
     const db = new DatabaseSync(dbPath);
 
-    // Initialize Schema
     db.exec(`
       CREATE TABLE IF NOT EXISTS products (
         id TEXT PRIMARY KEY,
@@ -149,7 +223,6 @@ function getDb() {
 
     ensureDefaultStaffUsers(db);
 
-    // Check if table is empty; if so, seed from craftItems
     const countRow: any = db.prepare('SELECT COUNT(*) as count FROM products').get();
     if (!countRow || countRow.count === 0) {
       seedProducts(db);
@@ -230,40 +303,7 @@ function ensureDefaultStaffUsers(db: any) {
   }
 }
 
-export function getAllStaffUsers(): DbStaffUser[] {
-  const db = getDb();
-  if (!db) return [];
-
-  const rows: any[] = db.prepare('SELECT * FROM staff_users WHERE isActive = 1 ORDER BY fullName ASC').all();
-  return rows.map((row) => ({
-    id: row.id,
-    username: row.username,
-    passwordHash: row.passwordHash,
-    passwordSalt: row.passwordSalt,
-    fullName: row.fullName,
-    role: row.role,
-    department: row.department || 'Operations',
-    departmentShort: row.departmentShort || row.department || 'Operations',
-    icon: row.icon || '👤',
-    description: row.description || '',
-    colorBg: row.colorBg || '#eff6ff',
-    colorBorder: row.colorBorder || '#bfdbfe',
-    colorText: row.colorText || '#1e3a8a',
-    isActive: Number(row.isActive) || 0,
-    permissions: row.permissions || '[]',
-    createdAt: row.createdAt,
-    updatedAt: row.updatedAt,
-  }));
-}
-
-export function getStaffByUsername(username: string): DbStaffUser | null {
-  const db = getDb();
-  if (!db) return null;
-
-  const normalizedUsername = username.trim().toLowerCase();
-  const row: any = db.prepare('SELECT * FROM staff_users WHERE username = ? AND isActive = 1').get(normalizedUsername);
-  if (!row) return null;
-
+function mapStaffUserRow(row: any): DbStaffUser {
   return {
     id: row.id,
     username: row.username,
@@ -285,8 +325,37 @@ export function getStaffByUsername(username: string): DbStaffUser | null {
   };
 }
 
-export function createStaffUser(input: Partial<DbStaffUser> & { password: string; username: string; fullName: string; role?: string; department?: string; departmentShort?: string; }): DbStaffUser | null {
-  const db = getDb();
+export async function getAllStaffUsers(env?: CloudflareEnv): Promise<DbStaffUser[]> {
+  const db = await getDb(env);
+  if (!db) return [];
+
+  if (isD1Database(db)) {
+    const rows = await db.prepare('SELECT * FROM staff_users WHERE isActive = 1 ORDER BY fullName ASC').all();
+    return (rows.results || []).map(mapStaffUserRow);
+  }
+
+  const rows: any[] = db.prepare('SELECT * FROM staff_users WHERE isActive = 1 ORDER BY fullName ASC').all();
+  return rows.map(mapStaffUserRow);
+}
+
+export async function getStaffByUsername(username: string, env?: CloudflareEnv): Promise<DbStaffUser | null> {
+  const db = await getDb(env);
+  if (!db) return null;
+
+  const normalizedUsername = username.trim().toLowerCase();
+
+  if (isD1Database(db)) {
+    const row = await db.prepare('SELECT * FROM staff_users WHERE username = ? AND isActive = 1').bind(normalizedUsername).first();
+    return row ? mapStaffUserRow(row) : null;
+  }
+
+  const row: any = db.prepare('SELECT * FROM staff_users WHERE username = ? AND isActive = 1').get(normalizedUsername);
+  if (!row) return null;
+  return mapStaffUserRow(row);
+}
+
+export async function createStaffUser(input: Partial<DbStaffUser> & { password: string; username: string; fullName: string; role?: string; department?: string; departmentShort?: string; }, env?: CloudflareEnv): Promise<DbStaffUser | null> {
+  const db = await getDb(env);
   if (!db) return null;
 
   const username = input.username.trim().toLowerCase();
@@ -295,37 +364,66 @@ export function createStaffUser(input: Partial<DbStaffUser> & { password: string
   const id = input.id || `staff_${username.replace(/[^a-z0-9]+/g, '_')}`;
 
   try {
-    db.prepare(`
-      INSERT INTO staff_users (
-        id, username, passwordHash, passwordSalt, fullName, role,
-        department, departmentShort, icon, description,
-        colorBg, colorBorder, colorText, isActive, permissions,
-        createdAt, updatedAt
-      ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
-    `).run(
-      id,
-      username,
-      hash,
-      salt,
-      input.fullName,
-      input.role || 'Staff',
-      input.department || 'Operations',
-      input.departmentShort || input.department || 'Operations',
-      input.icon || '👤',
-      input.description || '',
-      input.colorBg || '#eff6ff',
-      input.colorBorder || '#bfdbfe',
-      input.colorText || '#1e3a8a',
-      1,
-      JSON.stringify(input.permissions ? (Array.isArray(input.permissions) ? input.permissions : [input.permissions]) : []),
-      now,
-      now
-    );
+    if (isD1Database(db)) {
+      await db.prepare(`
+        INSERT INTO staff_users (
+          id, username, passwordHash, passwordSalt, fullName, role,
+          department, departmentShort, icon, description,
+          colorBg, colorBorder, colorText, isActive, permissions,
+          createdAt, updatedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).bind(
+        id,
+        username,
+        hash,
+        salt,
+        input.fullName,
+        input.role || 'Staff',
+        input.department || 'Operations',
+        input.departmentShort || input.department || 'Operations',
+        input.icon || '👤',
+        input.description || '',
+        input.colorBg || '#eff6ff',
+        input.colorBorder || '#bfdbfe',
+        input.colorText || '#1e3a8a',
+        1,
+        JSON.stringify(input.permissions ? (Array.isArray(input.permissions) ? input.permissions : [input.permissions]) : []),
+        now,
+        now
+      ).run();
+    } else {
+      db.prepare(`
+        INSERT INTO staff_users (
+          id, username, passwordHash, passwordSalt, fullName, role,
+          department, departmentShort, icon, description,
+          colorBg, colorBorder, colorText, isActive, permissions,
+          createdAt, updatedAt
+        ) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+      `).run(
+        id,
+        username,
+        hash,
+        salt,
+        input.fullName,
+        input.role || 'Staff',
+        input.department || 'Operations',
+        input.departmentShort || input.department || 'Operations',
+        input.icon || '👤',
+        input.description || '',
+        input.colorBg || '#eff6ff',
+        input.colorBorder || '#bfdbfe',
+        input.colorText || '#1e3a8a',
+        1,
+        JSON.stringify(input.permissions ? (Array.isArray(input.permissions) ? input.permissions : [input.permissions]) : []),
+        now,
+        now
+      );
+    }
   } catch {
     return null;
   }
 
-  return getStaffByUsername(username);
+  return getStaffByUsername(username, env);
 }
 
 function seedProducts(db: any) {
@@ -347,7 +445,7 @@ function seedProducts(db: any) {
 
   for (const it of craftItems) {
     const priceNum = parseFloat(it.displayPrice.replace(/[^0-9.]/g, '')) || 0;
-      const staff = (it as any).staffInCharge || '';
+    const staff = (it as any).staffInCharge || '';
     insert.run(
       String(it.id),
       it.itemNumber || `Item ${it.id}`,
@@ -372,6 +470,51 @@ function seedProducts(db: any) {
       now,
       now
     );
+  }
+}
+
+async function seedProductsD1(db: D1DatabaseLike) {
+  const now = new Date().toISOString();
+
+  for (const it of craftItems) {
+    const priceNum = parseFloat(it.displayPrice.replace(/[^0-9.]/g, '')) || 0;
+    const staff = (it as any).staffInCharge || '';
+    await db.prepare(`
+      INSERT INTO products (
+        id, itemNumber, name, shortName, category, categoryLabel,
+        subCategory, subCategoryLabel, staffInCharge, stock, price,
+        displayPrice, tag, accent, icon, imageUrl, description,
+        materials, isBlindBox, sizes, createdAt, updatedAt
+      ) VALUES (
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?,
+        ?, ?, ?, ?, ?, ?,
+        ?, ?, ?, ?
+      )
+    `).bind(
+      String(it.id),
+      it.itemNumber || `Item ${it.id}`,
+      it.name,
+      it.shortName || it.name,
+      it.category,
+      it.categoryLabel || it.category,
+      it.subCategory || 'all',
+      it.subCategoryLabel || '',
+      staff,
+      25,
+      priceNum,
+      it.displayPrice,
+      it.tag || '',
+      it.accent || 'butter',
+      it.icon || '✨',
+      it.imageUrl || '',
+      it.description || '',
+      it.materials || '',
+      it.isBlindBox ? 1 : 0,
+      it.sizes ? JSON.stringify(it.sizes) : '',
+      now,
+      now
+    ).run();
   }
 }
 
@@ -414,8 +557,8 @@ function rowToProduct(row: any): DbProduct {
   };
 }
 
-export function getAllProducts(): DbProduct[] {
-  const db = getDb();
+export async function getAllProducts(env?: CloudflareEnv): Promise<DbProduct[]> {
+  const db = await getDb(env);
   if (!db) {
     return craftItems.map((it) => ({
       ...it,
@@ -425,19 +568,30 @@ export function getAllProducts(): DbProduct[] {
     }));
   }
 
+  if (isD1Database(db)) {
+    const rows = await db.prepare('SELECT * FROM products ORDER BY rowid ASC').all();
+    return (rows.results || []).map(rowToProduct);
+  }
+
   const rows: any[] = db.prepare('SELECT * FROM products ORDER BY rowid ASC').all();
   return rows.map(rowToProduct);
 }
 
-export function getProductById(id: string | number): DbProduct | null {
-  const db = getDb();
+export async function getProductById(id: string | number, env?: CloudflareEnv): Promise<DbProduct | null> {
+  const db = await getDb(env);
   if (!db) return null;
+
+  if (isD1Database(db)) {
+    const row = await db.prepare('SELECT * FROM products WHERE id = ?').bind(String(id)).first();
+    return row ? rowToProduct(row) : null;
+  }
+
   const row: any = db.prepare('SELECT * FROM products WHERE id = ?').get(String(id));
   return row ? rowToProduct(row) : null;
 }
 
-export function addProduct(item: Partial<DbProduct>): DbProduct {
-  const db = getDb();
+export async function addProduct(item: Partial<DbProduct>, env?: CloudflareEnv): Promise<DbProduct> {
+  const db = await getDb(env);
   const id = item.id !== undefined ? String(item.id) : `p_${Date.now()}`;
   const now = new Date().toISOString();
   const priceNum = typeof item.price === 'number' ? item.price : parseFloat(String(item.displayPrice || '0').replace(/[^0-9.]/g, '')) || 0;
@@ -445,44 +599,83 @@ export function addProduct(item: Partial<DbProduct>): DbProduct {
   const staff = item.staffInCharge || '';
 
   if (db) {
-    const insert = db.prepare(`
-      INSERT INTO products (
-        id, itemNumber, name, shortName, category, categoryLabel,
-        subCategory, subCategoryLabel, staffInCharge, stock, price,
-        displayPrice, tag, accent, icon, imageUrl, description,
-        materials, isBlindBox, sizes, createdAt, updatedAt
-      ) VALUES (
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?, ?,
-        ?, ?, ?, ?, ?
-      )
-    `);
+    if (isD1Database(db)) {
+      await db.prepare(`
+        INSERT INTO products (
+          id, itemNumber, name, shortName, category, categoryLabel,
+          subCategory, subCategoryLabel, staffInCharge, stock, price,
+          displayPrice, tag, accent, icon, imageUrl, description,
+          materials, isBlindBox, sizes, createdAt, updatedAt
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?
+        )
+      `).bind(
+        id,
+        item.itemNumber || `Item ${id}`,
+        item.name || 'Untitled Craft Item',
+        item.shortName || item.name || 'Untitled Craft Item',
+        item.category || '3d-prints',
+        item.categoryLabel || item.category || '3D Prints & Fidgets',
+        item.subCategory || 'all',
+        item.subCategoryLabel || '',
+        staff,
+        item.stock !== undefined ? Number(item.stock) : 25,
+        priceNum,
+        displayPrice,
+        item.tag || '',
+        item.accent || 'butter',
+        item.icon || '✨',
+        item.imageUrl || '',
+        item.description || '',
+        item.materials || '',
+        item.isBlindBox ? 1 : 0,
+        item.sizes ? JSON.stringify(item.sizes) : '',
+        now,
+        now
+      ).run();
+    } else {
+      const insert = db.prepare(`
+        INSERT INTO products (
+          id, itemNumber, name, shortName, category, categoryLabel,
+          subCategory, subCategoryLabel, staffInCharge, stock, price,
+          displayPrice, tag, accent, icon, imageUrl, description,
+          materials, isBlindBox, sizes, createdAt, updatedAt
+        ) VALUES (
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?,
+          ?, ?, ?, ?, ?, ?,
+          ?, ?, ?, ?
+        )
+      `);
 
-    insert.run(
-      id,
-      item.itemNumber || `Item ${id}`,
-      item.name || 'Untitled Craft Item',
-      item.shortName || item.name || 'Untitled Craft Item',
-      item.category || '3d-prints',
-      item.categoryLabel || item.category || '3D Prints & Fidgets',
-      item.subCategory || 'all',
-      item.subCategoryLabel || '',
-      staff,
-      item.stock !== undefined ? Number(item.stock) : 25,
-      priceNum,
-      displayPrice,
-      item.tag || '',
-      item.accent || 'butter',
-      item.icon || '✨',
-      item.imageUrl || '',
-      item.description || '',
-      item.materials || '',
-      item.isBlindBox ? 1 : 0,
-      item.sizes ? JSON.stringify(item.sizes) : '',
-      now,
-      now
-    );
+      insert.run(
+        id,
+        item.itemNumber || `Item ${id}`,
+        item.name || 'Untitled Craft Item',
+        item.shortName || item.name || 'Untitled Craft Item',
+        item.category || '3d-prints',
+        item.categoryLabel || item.category || '3D Prints & Fidgets',
+        item.subCategory || 'all',
+        item.subCategoryLabel || '',
+        staff,
+        item.stock !== undefined ? Number(item.stock) : 25,
+        priceNum,
+        displayPrice,
+        item.tag || '',
+        item.accent || 'butter',
+        item.icon || '✨',
+        item.imageUrl || '',
+        item.description || '',
+        item.materials || '',
+        item.isBlindBox ? 1 : 0,
+        item.sizes ? JSON.stringify(item.sizes) : '',
+        now,
+        now
+      );
+    }
   }
 
   const numId = Number(id);
@@ -514,9 +707,9 @@ export function addProduct(item: Partial<DbProduct>): DbProduct {
   };
 }
 
-export function updateProduct(id: string | number, item: Partial<DbProduct>): DbProduct | null {
-  const db = getDb();
-  const existing = getProductById(id);
+export async function updateProduct(id: string | number, item: Partial<DbProduct>, env?: CloudflareEnv): Promise<DbProduct | null> {
+  const db = await getDb(env);
+  const existing = await getProductById(id, env);
   if (!existing && !db) return null;
 
   const updated: DbProduct = {
@@ -531,73 +724,133 @@ export function updateProduct(id: string | number, item: Partial<DbProduct>): Db
   }
 
   if (db) {
-    const stmt = db.prepare(`
-      UPDATE products SET
-        itemNumber = ?,
-        name = ?,
-        shortName = ?,
-        category = ?,
-        categoryLabel = ?,
-        subCategory = ?,
-        subCategoryLabel = ?,
-        staffInCharge = ?,
-        stock = ?,
-        price = ?,
-        displayPrice = ?,
-        tag = ?,
-        accent = ?,
-        icon = ?,
-        imageUrl = ?,
-        description = ?,
-        materials = ?,
-        isBlindBox = ?,
-        sizes = ?,
-        updatedAt = ?
-      WHERE id = ?
-    `);
+    if (isD1Database(db)) {
+      await db.prepare(`
+        UPDATE products SET
+          itemNumber = ?,
+          name = ?,
+          shortName = ?,
+          category = ?,
+          categoryLabel = ?,
+          subCategory = ?,
+          subCategoryLabel = ?,
+          staffInCharge = ?,
+          stock = ?,
+          price = ?,
+          displayPrice = ?,
+          tag = ?,
+          accent = ?,
+          icon = ?,
+          imageUrl = ?,
+          description = ?,
+          materials = ?,
+          isBlindBox = ?,
+          sizes = ?,
+          updatedAt = ?
+        WHERE id = ?
+      `).bind(
+        updated.itemNumber,
+        updated.name,
+        updated.shortName,
+        updated.category,
+        updated.categoryLabel,
+        updated.subCategory,
+        updated.subCategoryLabel,
+        updated.staffInCharge,
+        Number(updated.stock) || 0,
+        Number(updated.price) || 0,
+        updated.displayPrice,
+        updated.tag || '',
+        updated.accent || 'butter',
+        updated.icon || '✨',
+        updated.imageUrl || '',
+        updated.description || '',
+        updated.materials || '',
+        updated.isBlindBox ? 1 : 0,
+        updated.sizes ? JSON.stringify(updated.sizes) : '',
+        updated.updatedAt || new Date().toISOString(),
+        String(id)
+      ).run();
+    } else {
+      const stmt = db.prepare(`
+        UPDATE products SET
+          itemNumber = ?,
+          name = ?,
+          shortName = ?,
+          category = ?,
+          categoryLabel = ?,
+          subCategory = ?,
+          subCategoryLabel = ?,
+          staffInCharge = ?,
+          stock = ?,
+          price = ?,
+          displayPrice = ?,
+          tag = ?,
+          accent = ?,
+          icon = ?,
+          imageUrl = ?,
+          description = ?,
+          materials = ?,
+          isBlindBox = ?,
+          sizes = ?,
+          updatedAt = ?
+        WHERE id = ?
+      `);
 
-    stmt.run(
-      updated.itemNumber,
-      updated.name,
-      updated.shortName,
-      updated.category,
-      updated.categoryLabel,
-      updated.subCategory,
-      updated.subCategoryLabel,
-      updated.staffInCharge,
-      Number(updated.stock) || 0,
-      Number(updated.price) || 0,
-      updated.displayPrice,
-      updated.tag || '',
-      updated.accent || 'butter',
-      updated.icon || '✨',
-      updated.imageUrl || '',
-      updated.description || '',
-      updated.materials || '',
-      updated.isBlindBox ? 1 : 0,
-      updated.sizes ? JSON.stringify(updated.sizes) : '',
-      updated.updatedAt || new Date().toISOString(),
-      String(id)
-    );
+      stmt.run(
+        updated.itemNumber,
+        updated.name,
+        updated.shortName,
+        updated.category,
+        updated.categoryLabel,
+        updated.subCategory,
+        updated.subCategoryLabel,
+        updated.staffInCharge,
+        Number(updated.stock) || 0,
+        Number(updated.price) || 0,
+        updated.displayPrice,
+        updated.tag || '',
+        updated.accent || 'butter',
+        updated.icon || '✨',
+        updated.imageUrl || '',
+        updated.description || '',
+        updated.materials || '',
+        updated.isBlindBox ? 1 : 0,
+        updated.sizes ? JSON.stringify(updated.sizes) : '',
+        updated.updatedAt || new Date().toISOString(),
+        String(id)
+      );
+    }
   }
 
   return updated;
 }
 
-export function deleteProduct(id: string | number): boolean {
-  const db = getDb();
+export async function deleteProduct(id: string | number, env?: CloudflareEnv): Promise<boolean> {
+  const db = await getDb(env);
   if (!db) return false;
+
+  if (isD1Database(db)) {
+    await db.prepare('DELETE FROM products WHERE id = ?').bind(String(id)).run();
+    return true;
+  }
+
   const stmt = db.prepare('DELETE FROM products WHERE id = ?');
   stmt.run(String(id));
   return true;
 }
 
-export function resetProducts(): DbProduct[] {
-  const db = getDb();
+export async function resetProducts(env?: CloudflareEnv): Promise<DbProduct[]> {
+  const db = await getDb(env);
   if (db) {
-    db.exec('DELETE FROM products');
-    seedProducts(db);
+    if (isD1Database(db)) {
+      await db.exec('DELETE FROM products');
+      await seedProductsD1(db);
+    } else {
+      db.exec('DELETE FROM products');
+      seedProducts(db);
+    }
   }
-  return getAllProducts();
+  return getAllProducts(env);
 }
 

@@ -71,7 +71,7 @@ export async function onRequestPost({
     return jsonResponse({ error: 'Invalid username or password.' }, 401);
   }
 
-  const dbStaff = getStaffByUsername(username);
+  const dbStaff = await getStaffByUsername(username, env);
   if (dbStaff && verifyStaffPassword(password, dbStaff.passwordHash, dbStaff.passwordSalt)) {
     return jsonResponse({ staff: normalizeStaffUser(dbStaff) }, 200);
   }

@@ -10,7 +10,7 @@ function jsonResponse(body: Record<string, unknown>, status: number): Response {
   });
 }
 
-export async function onRequestPost({ request }: { request: Request }): Promise<Response> {
+export async function onRequestPost({ request, env }: { request: Request; env?: { DB?: any } }): Promise<Response> {
   let body: unknown;
 
   try {
@@ -37,7 +37,7 @@ export async function onRequestPost({ request }: { request: Request }): Promise<
     return jsonResponse({ success: false, error: 'Username, password, and full name are required.' }, 400);
   }
 
-  const created = createStaffUser({
+  const created = await createStaffUser({
     username,
     password,
     fullName,
@@ -47,7 +47,7 @@ export async function onRequestPost({ request }: { request: Request }): Promise<
     icon,
     description,
     permissions: JSON.stringify(permissions),
-  });
+  }, env);
 
   if (!created) {
     return jsonResponse({ success: false, error: 'That username is already in use or could not be created.' }, 409);
