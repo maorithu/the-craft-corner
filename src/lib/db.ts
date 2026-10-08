@@ -169,6 +169,12 @@ async function getDb(env?: CloudflareEnv) {
   const d1Db = resolveD1Binding(env);
   if (isD1Database(d1Db)) {
     await ensureD1Schema(d1Db);
+
+    const countRow: any = await d1Db.prepare('SELECT COUNT(*) as count FROM products').first();
+    if (!countRow || Number(countRow.count) === 0) {
+      await seedProductsD1(d1Db);
+    }
+
     return d1Db;
   }
 
