@@ -354,7 +354,39 @@ export async function getStaffByUsername(username: string, env?: CloudflareEnv):
   return mapStaffUserRow(row);
 }
 
-export async function createStaffUser(input: Partial<DbStaffUser> & { password: string; username: string; fullName: string; role?: string; department?: string; departmentShort?: string; }, env?: CloudflareEnv): Promise<DbStaffUser | null> {
+function normalizePermissions(value: unknown): string[] {
+  if (Array.isArray(value)) {
+    return value.filter((entry): entry is string => typeof entry === 'string');
+  }
+
+  if (typeof value === 'string') {
+    try {
+      const parsed = JSON.parse(value);
+      if (Array.isArray(parsed)) {
+        return parsed.filter((entry): entry is string => typeof entry === 'string');
+      }
+    } catch {
+      return value ? [value] : [];
+    }
+
+    return value ? [value] : [];
+  }
+
+  return [];
+}
+
+export async function createStaffUser(
+  input: Partial<Omit<DbStaffUser, 'permissions'>> & {
+    password: string;
+    username: string;
+    fullName: string;
+    role?: string;
+    department?: string;
+    departmentShort?: string;
+    permissions?: string[] | string;
+  },
+  env?: CloudflareEnv,
+): Promise<DbStaffUser | null> {
   const db = await getDb(env);
   if (!db) return null;
 
@@ -362,6 +394,7 @@ export async function createStaffUser(input: Partial<DbStaffUser> & { password: 
   const now = new Date().toISOString();
   const { hash, salt } = hashStaffPassword(input.password);
   const id = input.id || `staff_${username.replace(/[^a-z0-9]+/g, '_')}`;
+  const permissions = normalizePermissions(input.permissions);
 
   try {
     if (isD1Database(db)) {
@@ -387,7 +420,7 @@ export async function createStaffUser(input: Partial<DbStaffUser> & { password: 
         input.colorBorder || '#bfdbfe',
         input.colorText || '#1e3a8a',
         1,
-        JSON.stringify(input.permissions ? (Array.isArray(input.permissions) ? input.permissions : [input.permissions]) : []),
+        JSON.stringify(permissions.length > 0 ? permissions : ['manage_orders']),
         now,
         now
       ).run();
@@ -414,7 +447,7 @@ export async function createStaffUser(input: Partial<DbStaffUser> & { password: 
         input.colorBorder || '#bfdbfe',
         input.colorText || '#1e3a8a',
         1,
-        JSON.stringify(input.permissions ? (Array.isArray(input.permissions) ? input.permissions : [input.permissions]) : []),
+        JSON.stringify(permissions.length > 0 ? permissions : ['manage_orders']),
         now,
         now
       );

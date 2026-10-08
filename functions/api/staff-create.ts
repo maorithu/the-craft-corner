@@ -31,7 +31,9 @@ export async function onRequestPost({ request, env }: { request: Request; env?: 
   const department = typeof form.department === 'string' ? form.department.trim() : 'Operations';
   const icon = typeof form.icon === 'string' ? form.icon.trim() : '👤';
   const description = typeof form.description === 'string' ? form.description.trim() : '';
-  const permissions = Array.isArray(form.permissions) ? form.permissions.filter((value): value is string => typeof value === 'string') : ['manage_orders'];
+  const permissions = Array.isArray(form.permissions)
+    ? form.permissions.filter((value): value is string => typeof value === 'string')
+    : ['manage_orders'];
 
   if (!username || !password || !fullName) {
     return jsonResponse({ success: false, error: 'Username, password, and full name are required.' }, 400);
@@ -46,7 +48,7 @@ export async function onRequestPost({ request, env }: { request: Request; env?: 
     departmentShort: department,
     icon,
     description,
-    permissions: JSON.stringify(permissions),
+    permissions,
   }, env);
 
   if (!created) {
