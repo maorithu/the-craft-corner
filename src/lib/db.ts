@@ -72,54 +72,17 @@ const dbPath = (() => {
 })();
 
 async function ensureD1Schema(db: D1DatabaseLike) {
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS products (
-      id TEXT PRIMARY KEY,
-      itemNumber TEXT,
-      name TEXT NOT NULL,
-      shortName TEXT,
-      category TEXT NOT NULL,
-      categoryLabel TEXT,
-      subCategory TEXT,
-      subCategoryLabel TEXT,
-      staffInCharge TEXT,
-      stock INTEGER DEFAULT 25,
-      price REAL DEFAULT 0,
-      displayPrice TEXT,
-      tag TEXT,
-      accent TEXT DEFAULT 'butter',
-      icon TEXT DEFAULT '✨',
-      imageUrl TEXT,
-      description TEXT,
-      materials TEXT,
-      isBlindBox INTEGER DEFAULT 0,
-      sizes TEXT,
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-  `);
+  try {
+    await db.prepare('CREATE TABLE IF NOT EXISTS products (id TEXT PRIMARY KEY, itemNumber TEXT, name TEXT NOT NULL, shortName TEXT, category TEXT NOT NULL, categoryLabel TEXT, subCategory TEXT, subCategoryLabel TEXT, staffInCharge TEXT, stock INTEGER DEFAULT 25, price REAL DEFAULT 0, displayPrice TEXT, tag TEXT, accent TEXT DEFAULT \'butter\', icon TEXT DEFAULT \'✨\', imageUrl TEXT, description TEXT, materials TEXT, isBlindBox INTEGER DEFAULT 0, sizes TEXT, createdAt TEXT, updatedAt TEXT)').run();
+  } catch (e) {
+    console.warn('ensureD1Schema products warning:', e);
+  }
 
-  await db.exec(`
-    CREATE TABLE IF NOT EXISTS staff_users (
-      id TEXT PRIMARY KEY,
-      username TEXT NOT NULL UNIQUE,
-      passwordHash TEXT NOT NULL,
-      passwordSalt TEXT NOT NULL,
-      fullName TEXT NOT NULL,
-      role TEXT NOT NULL,
-      department TEXT,
-      departmentShort TEXT,
-      icon TEXT DEFAULT '👤',
-      description TEXT,
-      colorBg TEXT DEFAULT '#eff6ff',
-      colorBorder TEXT DEFAULT '#bfdbfe',
-      colorText TEXT DEFAULT '#1e3a8a',
-      isActive INTEGER DEFAULT 1,
-      permissions TEXT DEFAULT '[]',
-      createdAt TEXT,
-      updatedAt TEXT
-    );
-  `);
+  try {
+    await db.prepare('CREATE TABLE IF NOT EXISTS staff_users (id TEXT PRIMARY KEY, username TEXT NOT NULL UNIQUE, passwordHash TEXT NOT NULL, passwordSalt TEXT NOT NULL, fullName TEXT NOT NULL, role TEXT NOT NULL, department TEXT, departmentShort TEXT, icon TEXT DEFAULT \'👤\', description TEXT, colorBg TEXT DEFAULT \'#eff6ff\', colorBorder TEXT DEFAULT \'#bfdbfe\', colorText TEXT DEFAULT \'#1e3a8a\', isActive INTEGER DEFAULT 1, permissions TEXT DEFAULT \'[]\', createdAt TEXT, updatedAt TEXT)').run();
+  } catch (e) {
+    console.warn('ensureD1Schema staff_users warning:', e);
+  }
 }
 
 export interface DbStaffUser {
@@ -410,6 +373,8 @@ export async function createStaffUser(
   const permissions = normalizePermissions(input.permissions);
 
   try {
+    await ensureD1Schema(db);
+
     if (isD1Database(db)) {
       await db.prepare(`
         INSERT INTO staff_users (
@@ -465,7 +430,8 @@ export async function createStaffUser(
         now
       );
     }
-  } catch {
+  } catch (error) {
+    console.error('Failed to create staff user:', error);
     return null;
   }
 
@@ -526,7 +492,7 @@ async function seedProductsD1(db: D1DatabaseLike) {
     const priceNum = parseFloat(it.displayPrice.replace(/[^0-9.]/g, '')) || 0;
     const staff = (it as any).staffInCharge || '';
     await db.prepare(`
-      INSERT INTO products (
+      INSERT OR IGNORE INTO products (
         id, itemNumber, name, shortName, category, categoryLabel,
         subCategory, subCategoryLabel, staffInCharge, stock, price,
         displayPrice, tag, accent, icon, imageUrl, description,
