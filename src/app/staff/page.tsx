@@ -2539,21 +2539,39 @@ function StaffPortalContent() {
             </table>
           </div>
 
-          {/* Add / Edit Product Modal */}
+          {/* Add / Edit Product Popup Dialog */}
           {isEditModalOpen && (
-            <div className="modal-backdrop" onClick={() => setIsEditModalOpen(false)}>
+            <div
+              className="modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              aria-labelledby="edit-product-dialog-title"
+              onClick={() => setIsEditModalOpen(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                background: 'rgba(15, 23, 42, 0.6)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+              }}
+            >
               <div
                 className="admin-edit-modal-box"
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   background: '#ffffff',
-                  borderRadius: '14px',
-                  width: '94%',
+                  borderRadius: '16px',
+                  border: '2px solid var(--line)',
+                  width: '100%',
                   maxWidth: '680px',
                   maxHeight: '90vh',
                   overflowY: 'auto',
                   padding: '24px',
-                  boxShadow: '0 20px 25px -5px rgba(0, 0, 0, 0.25)',
+                  boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.35)',
                 }}
               >
                 <div
@@ -2562,9 +2580,14 @@ function StaffPortalContent() {
                     justifyContent: 'space-between',
                     alignItems: 'center',
                     marginBottom: '18px',
+                    paddingBottom: '12px',
+                    borderBottom: '1.5px solid var(--line)',
                   }}
                 >
-                  <h3 style={{ margin: 0, fontSize: '1.25rem', color: 'var(--walnut-wood)' }}>
+                  <h3
+                    id="edit-product-dialog-title"
+                    style={{ margin: 0, fontSize: '1.25rem', color: 'var(--walnut-wood)' }}
+                  >
                     {editingProduct
                       ? `✏️ Edit Product #${editingProduct.id}`
                       : '✨ Add New Product to Inventory'}
@@ -2572,10 +2595,19 @@ function StaffPortalContent() {
                   <button
                     type="button"
                     onClick={() => setIsEditModalOpen(false)}
+                    aria-label="Close product dialog"
                     style={{
-                      background: 'transparent',
-                      border: 'none',
-                      fontSize: '1.2rem',
+                      background: '#f1f5f9',
+                      border: '1px solid #cbd5e1',
+                      borderRadius: '8px',
+                      width: '34px',
+                      height: '34px',
+                      display: 'inline-flex',
+                      alignItems: 'center',
+                      justifyContent: 'center',
+                      fontSize: '1rem',
+                      fontWeight: 800,
+                      color: '#334155',
                       cursor: 'pointer',
                     }}
                   >
@@ -3068,18 +3100,37 @@ function StaffPortalContent() {
             </div>
           )}
 
-          {/* Delete Confirmation Modal */}
+          {/* Delete Confirmation Popup Dialog */}
           {deleteCandidate && (
-            <div className="modal-backdrop" onClick={() => setDeleteCandidate(null)}>
+            <div
+              className="modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setDeleteCandidate(null)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                background: 'rgba(15, 23, 42, 0.6)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+              }}
+            >
               <div
                 className="admin-edit-modal-box"
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   background: '#ffffff',
-                  borderRadius: '12px',
+                  borderRadius: '16px',
+                  border: '2px solid var(--line)',
+                  width: '100%',
                   maxWidth: '460px',
                   padding: '24px',
                   textAlign: 'center',
+                  boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.35)',
                 }}
               >
                 <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🗑️</div>
@@ -3109,18 +3160,37 @@ function StaffPortalContent() {
             </div>
           )}
 
-          {/* Reset Confirmation Modal */}
+          {/* Reset Confirmation Popup Dialog */}
           {isResetConfirmOpen && (
-            <div className="modal-backdrop" onClick={() => setIsResetConfirmOpen(false)}>
+            <div
+              className="modal-backdrop"
+              role="dialog"
+              aria-modal="true"
+              onClick={() => setIsResetConfirmOpen(false)}
+              style={{
+                position: 'fixed',
+                inset: 0,
+                zIndex: 9999,
+                background: 'rgba(15, 23, 42, 0.6)',
+                backdropFilter: 'blur(4px)',
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                padding: '20px',
+              }}
+            >
               <div
                 className="admin-edit-modal-box"
                 onClick={(e) => e.stopPropagation()}
                 style={{
                   background: '#ffffff',
-                  borderRadius: '12px',
+                  borderRadius: '16px',
+                  border: '2px solid var(--line)',
+                  width: '100%',
                   maxWidth: '460px',
                   padding: '24px',
                   textAlign: 'center',
+                  boxShadow: '0 25px 50px -12px rgba(15, 23, 42, 0.35)',
                 }}
               >
                 <div style={{ fontSize: '2.5rem', marginBottom: '10px' }}>🔄</div>

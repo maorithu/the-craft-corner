@@ -8679,3 +8679,49 @@ h1, h2, h3, h4 {
   font-size: 0.95rem;
   text-decoration: none;
 }
+
+/* ==================== STAFF PORTAL POPUP DIALOGS ==================== */
+.modal-backdrop {
+  position: fixed;
+  inset: 0;
+  z-index: 9999;
+  background: rgba(15, 23, 42, 0.6);
+  backdrop-filter: blur(4px);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
+  overflow-y: auto;
+  animation: modalBackdropFadeIn 0.16s ease-out;
+}
+
+.admin-edit-modal-box {
+  position: relative;
+  z-index: 10000;
+  background: #ffffff;
+  border: 2px solid var(--line);
+  border-radius: 16px;
+  box-shadow: 0 25px 50px -12px rgba(15, 23, 42, 0.35);
+  animation: modalDialogPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
+}
+
+@keyframes modalBackdropFadeIn {
+  from {
+    opacity: 0;
+  }
+  to {
+    opacity: 1;
+  }
+}
+
+@keyframes modalDialogPopIn {
+  from {
+    opacity: 0;
+    transform: translateY(10px) scale(0.97);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0) scale(1);
+  }
+}
+
