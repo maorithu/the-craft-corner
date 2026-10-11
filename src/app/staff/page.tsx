@@ -2977,48 +2977,25 @@ function StaffPortalContent() {
                     </div>
                   </div>
 
-                  <div
-                    style={{
-                      display: 'grid',
-                      gridTemplateColumns: '1fr 1fr',
-                      gap: '12px',
-                      alignItems: 'center',
-                    }}
-                  >
-                    <div>
-                      <label
-                        style={{
-                          display: 'block',
-                          fontSize: '0.78rem',
-                          fontWeight: 700,
-                          marginBottom: '4px',
-                        }}
-                      >
-                        Tag / Feature Badge
-                      </label>
-                      <input
-                        type="text"
-                        value={formTag}
-                        onChange={(e) => setFormTag(e.target.value)}
-                        placeholder="e.g. Fan Favorite, Limited Edition"
-                        className="checkout-input"
-                      />
-                    </div>
-                    <div style={{ display: 'flex', alignItems: 'center', gap: '8px', paddingTop: '16px' }}>
-                      <input
-                        type="checkbox"
-                        id="modal-blind-box"
-                        checked={formIsBlindBox}
-                        onChange={(e) => setFormIsBlindBox(e.target.checked)}
-                        style={{ width: '18px', height: '18px', cursor: 'pointer' }}
-                      />
-                      <label
-                        htmlFor="modal-blind-box"
-                        style={{ fontSize: '0.82rem', fontWeight: 700, cursor: 'pointer' }}
-                      >
-                        🎁 Mark as Mystery Blind Box
-                      </label>
-                    </div>
+                  <div>
+                    <label
+                      style={{
+                        display: 'block',
+                        fontSize: '0.78rem',
+                        fontWeight: 700,
+                        marginBottom: '4px',
+                      }}
+                    >
+                      Tag / Feature Badge
+                    </label>
+                    <input
+                      type="text"
+                      value={formTag}
+                      onChange={(e) => setFormTag(e.target.value)}
+                      placeholder="e.g. Fan Favorite, Limited Edition"
+                      className="checkout-input"
+                      style={{ width: '100%' }}
+                    />
                   </div>
 
                   <div>
@@ -3033,12 +3010,12 @@ function StaffPortalContent() {
                       Product Description
                     </label>
                     <textarea
-                      rows={3}
+                      rows={4}
                       value={formDescription}
                       onChange={(e) => setFormDescription(e.target.value)}
                       placeholder="Describe what makes this craft item special..."
                       className="checkout-input"
-                      style={{ resize: 'vertical' }}
+                      style={{ width: '100%', minHeight: '96px', resize: 'vertical' }}
                     />
                   </div>
 
@@ -3053,13 +3030,40 @@ function StaffPortalContent() {
                     >
                       Craft Materials / Ingredients
                     </label>
-                    <input
-                      type="text"
+                    <textarea
+                      rows={3}
                       value={formMaterials}
                       onChange={(e) => setFormMaterials(e.target.value)}
                       placeholder="e.g. Eco-friendly PLA filament, latex-free bands"
                       className="checkout-input"
+                      style={{ width: '100%', minHeight: '76px', resize: 'vertical' }}
                     />
+                  </div>
+
+                  <div
+                    style={{
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '8px',
+                      padding: '10px 12px',
+                      background: '#fdf2f8',
+                      border: '1px solid #fbcfe8',
+                      borderRadius: '8px',
+                    }}
+                  >
+                    <input
+                      type="checkbox"
+                      id="modal-blind-box"
+                      checked={formIsBlindBox}
+                      onChange={(e) => setFormIsBlindBox(e.target.checked)}
+                      style={{ width: '18px', height: '18px', cursor: 'pointer', margin: 0 }}
+                    />
+                    <label
+                      htmlFor="modal-blind-box"
+                      style={{ fontSize: '0.84rem', fontWeight: 700, color: '#9d174d', cursor: 'pointer' }}
+                    >
+                      🎁 Mark as Mystery Blind Box
+                    </label>
                   </div>
 
                   <div

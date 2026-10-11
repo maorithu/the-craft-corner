@@ -8705,6 +8705,13 @@ h1, h2, h3, h4 {
   animation: modalDialogPopIn 0.18s cubic-bezier(0.16, 1, 0.3, 1);
 }
 
+.admin-edit-modal-box .checkout-input,
+.admin-edit-modal-box .checkout-select {
+  width: 100%;
+  box-sizing: border-box;
+  display: block;
+}
+
 @keyframes modalBackdropFadeIn {
   from {
     opacity: 0;
