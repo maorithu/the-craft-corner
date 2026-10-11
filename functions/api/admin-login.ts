@@ -43,9 +43,31 @@ export async function onRequestPost({
   }
 
   const adminCandidates = [
-    { username: env.STAFF_ADMIN_USERNAME, password: env.STAFF_ADMIN_PASSWORD, id: 'store_admin', name: 'Store Admin' },
-    { username: env.STAFF_DEFAULT_USERNAME, password: env.STAFF_DEFAULT_PASSWORD, id: 'staff_admin', name: 'Staff Admin' },
-  ];
+    {
+      username: env?.STAFF_ADMIN_USERNAME || process.env?.STAFF_ADMIN_USERNAME,
+      password: env?.STAFF_ADMIN_PASSWORD || process.env?.STAFF_ADMIN_PASSWORD,
+      id: 'store_admin',
+      name: 'Store Admin',
+    },
+    {
+      username: env?.STAFF_DEFAULT_USERNAME || process.env?.STAFF_DEFAULT_USERNAME,
+      password: env?.STAFF_DEFAULT_PASSWORD || process.env?.STAFF_DEFAULT_PASSWORD,
+      id: 'staff_admin',
+      name: 'Staff Admin',
+    },
+  ].filter((c) => Boolean(c.username && c.password));
+
+  // Local development fallback when no Cloudflare secrets are configured on localhost
+  const reqUrl = new URL(request.url);
+  const isLocalDev = reqUrl.hostname === 'localhost' || reqUrl.hostname === '127.0.0.1';
+  if (adminCandidates.length === 0 && isLocalDev) {
+    adminCandidates.push({
+      username: 'admin',
+      password: 'admin',
+      id: 'staff_admin',
+      name: 'Staff Admin',
+    });
+  }
 
   const match = adminCandidates.find(
     (candidate) =>
@@ -68,7 +90,7 @@ export async function onRequestPost({
       role: 'Administrator',
       deptName: 'Operations',
       deptShort: 'Operations',
-      description: 'Cloudflare-managed admin account',
+      description: 'Cloudflare-managed staff management account',
       colorBg: '#fef3c7',
       colorBorder: '#fcd34d',
       colorText: '#92400e',

@@ -1,9 +1,7 @@
 'use client';
 
-import { useState } from 'react';
 import Link from 'next/link';
-import { useCart, PlacedOrder } from '@/context/CartContext';
-import { sound } from '@/utils/soundEffects';
+import { useCart } from '@/context/CartContext';
 
 export default function CartDrawer() {
   const {
@@ -12,22 +10,10 @@ export default function CartDrawer() {
     closeCart,
     removeFromCart,
     updateQuantity,
-    clearCart,
     totalCount,
     subtotal,
     formattedSubtotal,
-    placeOrder,
   } = useCart();
-
-  const [placedOrder, setPlacedOrder] = useState<PlacedOrder | null>(null);
-  const [customerName, setCustomerName] = useState('');
-  const [customerEmail, setCustomerEmail] = useState('');
-  const [customerStreet, setCustomerStreet] = useState('');
-  const [customerCity, setCustomerCity] = useState('');
-  const [customerStateZip, setCustomerStateZip] = useState('');
-  const [cardNumber, setCardNumber] = useState('');
-  const [customerNotes, setCustomerNotes] = useState('');
-  const [pickupOrShip, setPickupOrShip] = useState<'mail' | 'delivery'>('mail');
 
   if (!isCartOpen) return null;
 
@@ -35,39 +21,6 @@ export default function CartDrawer() {
   const freeSpoonThreshold = 50.0;
   const amountToFreeSpoon = Math.max(0, freeSpoonThreshold - subtotal);
   const spoonProgressPercent = Math.min(100, (subtotal / freeSpoonThreshold) * 100);
-
-  const handleSimulateCheckout = (e: React.FormEvent) => {
-    e.preventDefault();
-    sound.playFanfare();
-    sound.playBeadChime();
-
-    const fullAddress = [customerStreet.trim(), customerCity.trim(), customerStateZip.trim()]
-      .filter(Boolean)
-      .join(', ') || '123 Craft Lane, Sunnyvale, CA 94086';
-
-    const order = placeOrder({
-      customerName: customerName.trim() || 'Milca',
-      customerEmail: customerEmail.trim() || 'milca@craftclub.com',
-      customerAddress: fullAddress,
-      cardNumber: cardNumber.trim() || '4532 8890 1234 5678',
-      pickupOrShip,
-      customerNotes: customerNotes.trim(),
-    });
-
-    setPlacedOrder(order);
-  };
-
-  const handleCloseAll = () => {
-    setPlacedOrder(null);
-    closeCart();
-  };
-
-  // Card input formatting helper
-  const handleCardInputChange = (val: string) => {
-    const raw = val.replace(/\D/g, '').slice(0, 16);
-    const formatted = raw.replace(/(\d{4})(?=\d)/g, '$1 ');
-    setCardNumber(formatted);
-  };
 
   return (
     <div
@@ -123,71 +76,7 @@ export default function CartDrawer() {
         </div>
 
         {/* Body Content */}
-        {placedOrder ? (
-          /* Order Confirmation Screen */
-          <div className="cart-success-view">
-            <div className="success-sparkle-badge">🎉 📦 🌸 ✨</div>
-            <h2>Order #{placedOrder.orderCode} Placed!</h2>
-
-            <p className="success-greeting">
-              Thank you, <strong>{placedOrder.customerName}</strong>!
-            </p>
-
-            <div className="success-details-box">
-              <div className="s-row">
-                <span>Tracking Code:</span>
-                <strong className="tracking-code-highlight">{placedOrder.orderCode}</strong>
-              </div>
-              <div className="s-row">
-                <span>Sent to Email:</span>
-                <strong>{placedOrder.customerEmail}</strong>
-              </div>
-              <div className="s-row">
-                <span>Delivery Address:</span>
-                <strong>{placedOrder.customerAddress}</strong>
-              </div>
-              <div className="s-row">
-                <span>Card Paid:</span>
-                <code>{placedOrder.cardNumberMasked}</code>
-              </div>
-              <div className="s-row">
-                <span>Method:</span>
-                <strong>{placedOrder.pickupOrShip === 'delivery' ? '🚚 Direct Doorstep Delivery' : '📬 By Mail (Standard Shipping)'}</strong>
-              </div>
-              <div className="s-row">
-                <span>Total Paid:</span>
-                <strong className="total-highlight">{placedOrder.formattedTotal}</strong>
-              </div>
-              {placedOrder.freeSpoonGift && (
-                <div className="s-row free-spoon-row">
-                  <span>Perk Perk:</span>
-                  <strong className="spoon-tag">🥄 Free Mystery Spoon Package Included!</strong>
-                </div>
-              )}
-            </div>
-
-            <p className="success-sub">
-              Enter your tracking code on our package tracker anytime to see your items being handcrafted, packed, and delivered!
-            </p>
-
-            <div className="success-action-buttons">
-              <Link
-                href={`/track?code=${placedOrder.orderCode}`}
-                className="primary-button track-order-cta-btn"
-                onClick={closeCart}
-              >
-                📦 Track Where Your Package Is →
-              </Link>
-              <button
-                type="button"
-                className="secondary-button"
-                onClick={handleCloseAll}
-              >
-                Continue Crafting 🎨
-              </button>
-            </div>
-          </div>
-        ) : cartItems.length === 0 ? (
+        {cartItems.length === 0 ? (
           /* Empty Cart State */
           <div className="cart-empty-view">
             <span className="cart-empty-icon">🧺</span>

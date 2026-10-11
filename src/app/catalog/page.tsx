@@ -2,15 +2,16 @@
 
 import { useState, useMemo, Suspense } from 'react';
 import Link from 'next/link';
-import { craftItems } from '@/data/items';
 import { useItemModal } from '@/context/ItemContext';
 import { useCart } from '@/context/CartContext';
+import { useInventory, ProductItem } from '@/context/InventoryContext';
 import { CraftItem } from '@/types';
 import HiddenPal from '@/components/HiddenPal';
 
 function CatalogContent() {
   const { openItemPreview } = useItemModal();
   const { addToCart } = useCart();
+  const { products } = useInventory();
   const [addedId, setAddedId] = useState<number | string | null>(null);
   const [categoryFilter, setCategoryFilter] = useState<string>('all');
   const [searchQuery, setSearchQuery] = useState('');
@@ -26,47 +27,52 @@ function CatalogContent() {
   ];
 
   const filteredItems = useMemo(() => {
-    return craftItems
+    return products
       .filter((item) => {
         if (categoryFilter === 'blind-boxes') {
-          if (!item.isBlindBox) return false;
+          if (!item.isBlindBox && item.category !== 'blind-boxes') return false;
+        } else if (categoryFilter === 'clickers') {
+          if (item.category !== 'clickers' && item.category !== 'dragon-puppets') return false;
         } else if (categoryFilter !== 'all') {
           if (item.category !== categoryFilter) return false;
         }
 
+        const q = searchQuery.toLowerCase();
         const matchesSearch =
-          item.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.shortName.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.description.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.materials.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.categoryLabel.toLowerCase().includes(searchQuery.toLowerCase()) ||
-          item.subCategoryLabel.toLowerCase().includes(searchQuery.toLowerCase());
+          (item.name || '').toLowerCase().includes(q) ||
+          (item.shortName || '').toLowerCase().includes(q) ||
+          (item.description || '').toLowerCase().includes(q) ||
+          (item.materials || '').toLowerCase().includes(q) ||
+          (item.categoryLabel || '').toLowerCase().includes(q) ||
+          (item.subCategoryLabel || '').toLowerCase().includes(q);
 
         return matchesSearch;
       })
       .sort((a, b) => {
         if (sortBy === 'name') return a.name.localeCompare(b.name);
         if (sortBy === 'price') {
-          const priceA = parseFloat(a.displayPrice.replace('$', ''));
-          const priceB = parseFloat(b.displayPrice.replace('$', ''));
+          const priceA = parseFloat(a.displayPrice.replace('$', '')) || 0;
+          const priceB = parseFloat(b.displayPrice.replace('$', '')) || 0;
           return priceA - priceB;
         }
-        return a.id - b.id;
+        return String(a.id).localeCompare(String(b.id), undefined, { numeric: true });
       });
-  }, [categoryFilter, searchQuery, sortBy]);
+  }, [products, categoryFilter, searchQuery, sortBy]);
 
-  const handleAddToCart = (e: React.MouseEvent, item: CraftItem) => {
+  const handleAddToCart = (e: React.MouseEvent, item: ProductItem) => {
     e.stopPropagation();
     const chosenSize = item.sizes ? selectedSizes[item.id] || item.sizes[0] : undefined;
     addToCart({
       id: item.id,
       name: item.name,
+      shortName: item.shortName,
       displayPrice: item.displayPrice,
-      icon: item.icon,
+      icon: item.icon || '✨',
       imageUrl: item.imageUrl,
       tag: item.tag,
       categoryLabel: item.categoryLabel,
       size: chosenSize,
+      staffInCharge: item.staffInCharge,
     });
     setAddedId(item.id);
     setTimeout(() => {
@@ -191,7 +197,7 @@ function CatalogContent() {
             <article
               key={item.id}
               className={`product-rect-card ${item.isBlindBox ? 'blind-box-card' : ''}`}
-              onClick={() => openItemPreview(item)}
+              onClick={() => openItemPreview(item as CraftItem)}
             >
               {/* Item Visual on Left inside Rectangle */}
               <div className={`rect-item-visual accent-${item.accent} ${item.imageUrl ? 'has-real-photo' : ''}`}>
@@ -267,7 +273,7 @@ function CatalogContent() {
                   className="secondary-button rect-preview-btn"
                   onClick={(e) => {
                     e.stopPropagation();
-                    openItemPreview(item);
+                    openItemPreview(item as CraftItem);
                   }}
                   aria-label={`Quick view details for ${item.name}`}
                 >

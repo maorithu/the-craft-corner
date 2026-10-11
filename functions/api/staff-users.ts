@@ -1,4 +1,4 @@
-import { getAllStaffUsers } from '../../src/lib/db';
+import { getAllStaffUsers, deleteStaffUser } from '../../src/lib/db';
 
 function formatStaffUser(staffUser: {
   id: string;
@@ -47,6 +47,35 @@ export async function onRequestGet({ env }: { env?: { DB?: any } } = {}): Promis
   const staffUsers = await getAllStaffUsers(env);
 
   return new Response(JSON.stringify({ staff: staffUsers.map(formatStaffUser) }), {
+    status: 200,
+    headers: {
+      'Content-Type': 'application/json',
+      'Cache-Control': 'no-store',
+    },
+  });
+}
+
+export async function onRequestDelete({
+  request,
+  env,
+}: {
+  request: Request;
+  env?: { DB?: any };
+}): Promise<Response> {
+  const url = new URL(request.url);
+  const id = url.searchParams.get('id');
+  if (!id) {
+    return new Response(JSON.stringify({ success: false, error: 'Staff id is required.' }), {
+      status: 400,
+      headers: {
+        'Content-Type': 'application/json',
+        'Cache-Control': 'no-store',
+      },
+    });
+  }
+
+  const deleted = await deleteStaffUser(id, env);
+  return new Response(JSON.stringify({ success: deleted }), {
     status: 200,
     headers: {
       'Content-Type': 'application/json',

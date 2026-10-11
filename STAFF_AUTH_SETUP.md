@@ -1,27 +1,23 @@
-# Staff Login Secrets
+# Staff Portal Authentication & Secrets Setup
 
-Staff and inventory-admin logins are verified by the Cloudflare Pages Function at `/api/staff-login` and `/api/admin-login`. The client bundle contains no staff usernames or passwords.
+The unified Staff Portal (`/staff`) contains three sections:
+1. **Order Management** — Authenticated via database-backed staff accounts (`staff_users` table in D1 / SQLite) via `/api/staff-login`.
+2. **Inventory Management** — Authenticated via database-backed staff accounts (`staff_users` table in D1 / SQLite) via `/api/staff-login`.
+3. **Staff Management** — Authenticated **exclusively** against Cloudflare environment variables via `/api/admin-login`.
 
-Configure these values as **environment variables** in Cloudflare Pages for both Production and Preview. Use newly rotated usernames and strong, unique passwords; the old credentials were present in client code and must no longer be used.
+## Cloudflare Admin Secrets (Staff Management Only)
 
-## Staff account secrets
-
-- `STAFF_ANNA_USERNAME`
-- `STAFF_ANNA_PASSWORD`
-- `STAFF_KAITLYN_USERNAME`
-- `STAFF_KAITLYN_PASSWORD`
-- `STAFF_NICOLE_USERNAME`
-- `STAFF_NICOLE_PASSWORD`
-
-## Admin account secrets
+Configure these environment variables in Cloudflare Pages (for both Production and Preview) to control access to the **Staff Management** section:
 
 - `STAFF_ADMIN_USERNAME`
 - `STAFF_ADMIN_PASSWORD`
-- `STAFF_DEFAULT_USERNAME`
-- `STAFF_DEFAULT_PASSWORD`
+- `STAFF_DEFAULT_USERNAME` (optional secondary admin username)
+- `STAFF_DEFAULT_PASSWORD` (optional secondary admin password)
 
-These are the values used by the admin access flow. If either admin pair is missing, `/admin` login will fail with a 401 even though the app code is correct.
+No staff usernames or passwords are stored in the client bundle. Individual staff accounts for Order Management and Inventory Management are created and managed inside the **Staff Management** section and stored hashed (`scrypt`) in the `staff_users` database table.
 
-For local development only, the app accepts `admin` / `admin` when `NODE_ENV` is `development` and no Cloudflare secret is configured. Production must still use Cloudflare-managed secrets.
+## Local Development
 
-For local Pages development, create an ignored `.dev.vars` file at the project root with the same variable names. Do not commit that file or share its values.
+For local development (`localhost` / `127.0.0.1`), if no Cloudflare admin environment variables are configured, `/api/admin-login` accepts `admin` / `admin` so you can unlock Staff Management and create staff accounts locally.
+
+You can also create an ignored `.dev.vars` file at the project root (see `.dev.vars.example`). Do not commit `.dev.vars`.

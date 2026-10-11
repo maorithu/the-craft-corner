@@ -4,28 +4,9 @@ import { useState, useEffect, Suspense } from 'react';
 import { useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { useCart, PlacedOrder } from '@/context/CartContext';
+import { getStaffDirectory, StaffProfile } from '@/lib/staffAuth';
 import { sound } from '@/utils/soundEffects';
 import HiddenPal from '@/components/HiddenPal';
-
-const specialtyLookup = {
-  anna: { icon: '🧋', name: 'Anna', colorBg: '#dbeafe', colorBorder: '#93c5fd', colorText: '#1e40af' },
-  kaitlyn: { icon: '🐉', name: 'Kaitlyn', colorBg: '#fef3c7', colorBorder: '#fcd34d', colorText: '#92400e' },
-  nicole: { icon: '🌸', name: 'Nicole', colorBg: '#fce7f3', colorBorder: '#fbcfe8', colorText: '#9d174d' },
-} as const;
-
-const getStaffInCharge = (item: {
-  name: string;
-  shortName?: string;
-  categoryLabel?: string;
-  tag?: string;
-  staffInCharge?: string;
-}) => {
-  if (item.staffInCharge && specialtyLookup[item.staffInCharge as keyof typeof specialtyLookup]) {
-    return specialtyLookup[item.staffInCharge as keyof typeof specialtyLookup];
-  }
-
-  return specialtyLookup.anna;
-};
 
 function TrackContent() {
   const searchParams = useSearchParams();
@@ -35,6 +16,18 @@ function TrackContent() {
   const [queryCode, setQueryCode] = useState(initialCode);
   const [currentOrder, setCurrentOrder] = useState<PlacedOrder | null>(null);
   const [hasSearched, setHasSearched] = useState(false);
+  const [staffDirectory, setStaffDirectory] = useState<StaffProfile[]>([]);
+
+  useEffect(() => {
+    getStaffDirectory().then(setStaffDirectory);
+  }, []);
+
+  const resolveStaffBadge = (staffId?: string) => {
+    if (!staffId) return null;
+    return staffDirectory.find(
+      (m) => m.id === staffId || m.username === staffId.toLowerCase()
+    ) || null;
+  };
 
   useEffect(() => {
     if (initialCode) {
@@ -44,25 +37,43 @@ function TrackContent() {
         setCurrentOrder(found);
       }
       setHasSearched(true);
-    } else if (orders.length > 0) {
-      // Default to the most recent placed order for convenience
+    } else if (orders.length > 0 && !hasSearched) {
       setCurrentOrder(orders[0]);
       setQueryCode(orders[0].orderCode);
+    } else if (currentOrder) {
+      const refreshed = getOrder(currentOrder.orderCode);
+      if (refreshed) setCurrentOrder(refreshed);
     }
   }, [initialCode, orders, getOrder]);
 
-  const handleLookup = (e: React.FormEvent) => {
+  const handleLookup = async (e: React.FormEvent) => {
     e.preventDefault();
     sound.playClick();
     setHasSearched(true);
-    if (!queryCode.trim()) return;
-    const found = getOrder(queryCode.trim());
+    const trimmed = queryCode.trim();
+    if (!trimmed) return;
+    const found = getOrder(trimmed);
     if (found) {
       sound.playFanfare();
       setCurrentOrder(found);
-    } else {
-      setCurrentOrder(null);
+      return;
     }
+
+    try {
+      const res = await fetch(`/api/orders?query=${encodeURIComponent(trimmed)}`, { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.order) {
+          sound.playFanfare();
+          setCurrentOrder(data.order);
+          return;
+        }
+      }
+    } catch {
+      // ignore
+    }
+
+    setCurrentOrder(null);
   };
 
   const getStageIndex = (status: PlacedOrder['status']): number => {
@@ -231,7 +242,8 @@ function TrackContent() {
                       <strong>{it.shortName || it.name}</strong>
                       {it.size && <span className="pkg-size-pill">Size: {it.size}</span>}
                       {(() => {
-                        const lead = getStaffInCharge(it);
+                        const lead = resolveStaffBadge(it.staffInCharge || currentOrder.assignedStaffId);
+                        if (!lead) return null;
                         return (
                           <span
                             style={{

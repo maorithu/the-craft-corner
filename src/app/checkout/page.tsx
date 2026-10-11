@@ -80,6 +80,26 @@ export default function CheckoutPage() {
     return Object.keys(errors).length === 0;
   };
 
+  const handlePlaceDirectOrder = (e?: React.FormEvent) => {
+    if (e) e.preventDefault();
+    if (!validateForm()) {
+      sound.playClick();
+      return;
+    }
+    const currentData = formDataRef.current;
+    const newOrder = placeOrder({
+      customerName: currentData.customerName,
+      customerEmail: currentData.customerEmail,
+      customerAddress: currentData.customerAddress,
+      pickupOrShip: currentData.pickupOrShip,
+      customerNotes: currentData.customerNotes,
+      paymentMethod: 'card',
+      paypalOrderId: `ORDER-${Date.now()}`,
+    });
+    sound.playCelebration();
+    setPlacedOrder(newOrder);
+  };
+
   // Render PayPal Buttons when PayPal SDK is loaded and cart has items
   useEffect(() => {
     if (!paypalLoaded || !window.paypal || !paypalContainerRef.current) return;
@@ -376,7 +396,7 @@ export default function CheckoutPage() {
                       Gift or Delivery Instructions (Optional)
                       <textarea
                         rows={2}
-                        placeholder="e.g. Please leave on the porch, birthday message for Kaitlyn, etc."
+                        placeholder="e.g. Please leave on the porch, include a birthday gift note, etc."
                         value={customerNotes}
                         onChange={(e) => setCustomerNotes(e.target.value)}
                       />
@@ -390,9 +410,9 @@ export default function CheckoutPage() {
                 <div className="checkout-step-header">
                   <span className="step-num">2</span>
                   <div>
-                    <h2>Secure Payment via PayPal</h2>
+                    <h2>Complete Your Order</h2>
                     <p className="step-desc">
-                      Fast, safe, and buyer-protected checkout. Pay with your PayPal account or linked cards.
+                      Fast, safe, and buyer-protected checkout. Pay with PayPal or complete your craft order below.
                     </p>
                   </div>
                 </div>
@@ -413,14 +433,23 @@ export default function CheckoutPage() {
                   {isProcessing && (
                     <div className="paypal-processing-overlay">
                       <div className="spinner"></div>
-                      <p>Finalizing your order with PayPal...</p>
+                      <p>Finalizing your order...</p>
                     </div>
                   )}
 
                   <div ref={paypalContainerRef} className="paypal-btn-wrap" />
 
+                  <button
+                    type="button"
+                    className="primary-button"
+                    onClick={() => handlePlaceDirectOrder()}
+                    style={{ width: '100%', minHeight: '48px', fontSize: '1rem', fontWeight: 800, marginTop: '8px' }}
+                  >
+                    Complete Order ({formattedSubtotal}) ✨
+                  </button>
+
                   <div className="paypal-security-badge">
-                    <span>🔒 Official PayPal Encrypted Checkout • Buyer Protection Guarantee</span>
+                    <span>🔒 Official Encrypted Checkout • Buyer Protection Guarantee</span>
                   </div>
                 </div>
               </div>

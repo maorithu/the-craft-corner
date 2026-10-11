@@ -1,4 +1,4 @@
-import { CraftItem, MainCategory } from '@/types';
+import type { CraftItem } from '../types/index';
 
 export const craftItems: CraftItem[] = [
   // 1. RAINBOW LOOM - THEMED PACKETS & BLIND BOXES (In Bracelets Section)
@@ -467,80 +467,3 @@ export const craftItems: CraftItem[] = [
   },
 ];
 
-export type DropdownCard = {
-  id: MainCategory;
-  title: string;
-  badge: string;
-  icon: string;
-  accent: 'brioche' | 'matcha' | 'terracotta' | 'butter' | 'walnut' | 'oat';
-  description: string;
-  subPills: string[];
-  itemCount: number;
-};
-
-export type DropdownSection = {
-  sectionTitle: string;
-  sectionSubtitle: string;
-  cards: DropdownCard[];
-};
-
-export const dropdownSections: DropdownSection[] = [
-  {
-    sectionTitle: '📿 Jewelry & Wearables',
-    sectionSubtitle: 'Handmade Rainbow Loom Packets, Mystery Boxes & Bracelets',
-    cards: [
-      {
-        id: 'bracelets',
-        title: 'Bracelets & Rainbow Loom',
-        badge: 'Real Products! ✨',
-        icon: '🌈',
-        accent: 'butter',
-        description: 'Rainbow Loom Packets ($2.00), Mystery Blind Boxes ($2.50) & Loom Crafts',
-        subPills: ['🏖️ Beach', '🌌 Galaxy', '🟩 Minecraft', '🎁 Loom Blind Boxes ($2.50)', '🍂 Seasonal'],
-        itemCount: 18,
-      },
-    ],
-  },
-  {
-    sectionTitle: '🐉 3D Prints & Sensory Fidgets',
-    sectionSubtitle: 'Articulated Pocket Pets, Dragons, Clickers & Puppets',
-    cards: [
-      {
-        id: '3d-prints',
-        title: '3D Prints & Toys',
-        badge: 'Popular',
-        icon: '🐉',
-        accent: 'brioche',
-        description: 'Articulated Capybaras with Yuzu, Dinos, Sensory Slugs & Crystal Dragons',
-        subPills: ['🐾 3D Animals', '⚡ Fidgets', '🖨️ 3D Prints', '🥚 Dragon Eggs'],
-        itemCount: 5,
-      },
-      {
-        id: 'clickers',
-        title: 'Keyboard Clickers & Puppets',
-        badge: 'Tactile Fun',
-        icon: '⌨️',
-        accent: 'matcha',
-        description: 'Satisfying Axolotl Belly Clickers, Cat-Paw Keyboard Clickers & Dragon Puppets',
-        subPills: ['🦎 Axolotl Belly Clicker', '🐾 Cat-Paw Clicker', '🐲 Dragon Puppet'],
-        itemCount: 3,
-      },
-    ],
-  },
-  {
-    sectionTitle: '🎁 Mystery Blind Box Section',
-    sectionSubtitle: 'Surprise Squishies, Hatch Eggs, Sealed Loom Pouches & Mystery Pets',
-    cards: [
-      {
-        id: 'blind-boxes',
-        title: 'Blind Box Mystery Section',
-        badge: 'Surprise! 🎁',
-        icon: '🎁',
-        accent: 'walnut',
-        description: 'All Collectible Mystery Blind Boxes: Squishy Animals, Bakery Squishies, Loom Kits & Dragon Eggs',
-        subPills: ['🎁 All Blind Boxes', '🍡 Squishy Blind Boxes ($4.50)', '🌈 Loom Blind Boxes ($2.50)', '🥚 3D Dragon Eggs'],
-        itemCount: 11,
-      },
-    ],
-  },
-];

@@ -1,8 +1,7 @@
 'use client';
 
 import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
-import { CraftItem, MainCategory, SubCategory } from '@/types';
-import { craftItems } from '@/data/items';
+import { MainCategory, SubCategory } from '@/types';
 
 export interface ProductItem {
   id: string | number;
@@ -44,20 +43,10 @@ const InventoryContext = createContext<InventoryContextType | undefined>(undefin
 
 const LOCAL_STORAGE_KEY = 'craft_corner_inventory';
 
-function getDefaultProducts(): ProductItem[] {
-  return craftItems.map((it) => ({
-    ...it,
-    staffInCharge: it.staffInCharge || '',
-    stock: 25,
-    price: parseFloat(it.displayPrice.replace(/[^0-9.]/g, '')) || 0,
-  }));
-}
-
 export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
-  const [products, setProducts] = useState<ProductItem[]>(getDefaultProducts);
+  const [products, setProducts] = useState<ProductItem[]>([]);
   const [isLoading, setIsLoading] = useState<boolean>(true);
 
-  // Sync state to local storage
   const saveToLocal = (items: ProductItem[]) => {
     try {
       localStorage.setItem(LOCAL_STORAGE_KEY, JSON.stringify(items));
@@ -66,13 +55,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     }
   };
 
-  // Fetch all products from API, fallback to localStorage or default
   const refreshInventory = useCallback(async () => {
     try {
-      const res = await fetch('/api/inventory');
+      const res = await fetch('/api/inventory', { cache: 'no-store' });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && Array.isArray(data.products) && data.products.length > 0) {
+        if (data.success && Array.isArray(data.products)) {
           setProducts(data.products);
           saveToLocal(data.products);
           setIsLoading(false);
@@ -83,7 +71,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       console.warn('API fetch failed, falling back to local cache:', err);
     }
 
-    // Fallback to localStorage if API unavailable
     try {
       const local = localStorage.getItem(LOCAL_STORAGE_KEY);
       if (local) {
@@ -98,10 +85,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       // ignore
     }
 
-    // Default to items.ts
-    const defaults = getDefaultProducts();
-    setProducts(defaults);
-    saveToLocal(defaults);
     setIsLoading(false);
   }, []);
 
@@ -109,12 +92,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     refreshInventory();
   }, [refreshInventory]);
 
-  // Add Product
   const addProduct = async (item: Partial<ProductItem>): Promise<ProductItem> => {
     const tempId = `p_${Date.now()}`;
-    const priceNum = typeof item.price === 'number'
-      ? item.price
-      : parseFloat(String(item.displayPrice || '0').replace(/[^0-9.]/g, '')) || 0;
+    const priceNum =
+      typeof item.price === 'number'
+        ? item.price
+        : parseFloat(String(item.displayPrice || '0').replace(/[^0-9.]/g, '')) || 0;
     const formattedPrice = item.displayPrice || `$${priceNum.toFixed(2)}`;
 
     const newItem: ProductItem = {
@@ -142,12 +125,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       updatedAt: new Date().toISOString(),
     };
 
-    // Optimistically update state
-    const updatedList = [newItem, ...products];
-    setProducts(updatedList);
-    saveToLocal(updatedList);
+    setProducts((prev) => {
+      const next = [newItem, ...prev];
+      saveToLocal(next);
+      return next;
+    });
 
-    // Call API in background
     try {
       const res = await fetch('/api/inventory', {
         method: 'POST',
@@ -157,9 +140,14 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
       if (res.ok) {
         const data = await res.json();
         if (data.success && data.product) {
-          const syncedList = [data.product, ...products.filter((p) => p.id !== newItem.id)];
-          setProducts(syncedList);
-          saveToLocal(syncedList);
+          setProducts((prev) => {
+            const synced = [
+              data.product,
+              ...prev.filter((p) => String(p.id) !== String(newItem.id) && String(p.id) !== String(data.product.id)),
+            ];
+            saveToLocal(synced);
+            return synced;
+          });
           return data.product;
         }
       }
@@ -170,42 +158,57 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return newItem;
   };
 
-  // Update Product
-  const updateProduct = async (id: string | number, updates: Partial<ProductItem>): Promise<ProductItem | null> => {
+  const updateProduct = async (
+    id: string | number,
+    updates: Partial<ProductItem>
+  ): Promise<ProductItem | null> => {
     let updatedProduct: ProductItem | null = null;
 
-    const updatedList = products.map((p) => {
-      if (String(p.id) === String(id)) {
-        const priceNum = updates.price !== undefined
-          ? updates.price
-          : updates.displayPrice
-            ? parseFloat(updates.displayPrice.replace(/[^0-9.]/g, '')) || p.price || 0
-            : p.price;
-        const displayPrice = updates.displayPrice || (priceNum !== undefined ? `$${priceNum.toFixed(2)}` : p.displayPrice);
+    setProducts((prev) => {
+      const next = prev.map((p) => {
+        if (String(p.id) === String(id)) {
+          const priceNum =
+            updates.price !== undefined
+              ? updates.price
+              : updates.displayPrice
+                ? parseFloat(updates.displayPrice.replace(/[^0-9.]/g, '')) || p.price || 0
+                : p.price;
+          const displayPrice =
+            updates.displayPrice ||
+            (priceNum !== undefined ? `$${priceNum.toFixed(2)}` : p.displayPrice);
 
-        updatedProduct = {
-          ...p,
-          ...updates,
-          price: priceNum,
-          displayPrice,
-          updatedAt: new Date().toISOString(),
-        };
-        return updatedProduct;
-      }
-      return p;
+          updatedProduct = {
+            ...p,
+            ...updates,
+            price: priceNum,
+            displayPrice,
+            updatedAt: new Date().toISOString(),
+          };
+          return updatedProduct;
+        }
+        return p;
+      });
+      saveToLocal(next);
+      return next;
     });
 
-    if (!updatedProduct) return null;
-
-    setProducts(updatedList);
-    saveToLocal(updatedList);
-
     try {
-      await fetch('/api/inventory', {
+      const res = await fetch('/api/inventory', {
         method: 'PUT',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({ id, ...updates }),
       });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && data.product) {
+          updatedProduct = data.product;
+          setProducts((prev) => {
+            const next = prev.map((p) => (String(p.id) === String(id) ? data.product : p));
+            saveToLocal(next);
+            return next;
+          });
+        }
+      }
     } catch (err) {
       console.error('Failed to sync updated product to backend API:', err);
     }
@@ -213,11 +216,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return updatedProduct;
   };
 
-  // Delete Product
   const deleteProduct = async (id: string | number): Promise<boolean> => {
-    const updatedList = products.filter((p) => String(p.id) !== String(id));
-    setProducts(updatedList);
-    saveToLocal(updatedList);
+    setProducts((prev) => {
+      const next = prev.filter((p) => String(p.id) !== String(id));
+      saveToLocal(next);
+      return next;
+    });
 
     try {
       await fetch(`/api/inventory?id=${encodeURIComponent(String(id))}`, {
@@ -230,13 +234,12 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     return true;
   };
 
-  // Reset Inventory
   const resetInventory = async () => {
     try {
       const res = await fetch('/api/inventory/reset', { method: 'POST' });
       if (res.ok) {
         const data = await res.json();
-        if (data.success && data.products) {
+        if (data.success && Array.isArray(data.products)) {
           setProducts(data.products);
           saveToLocal(data.products);
           return;
@@ -245,10 +248,6 @@ export const InventoryProvider: React.FC<{ children: React.ReactNode }> = ({ chi
     } catch (err) {
       console.error('Failed to reset inventory on server:', err);
     }
-
-    const defaults = getDefaultProducts();
-    setProducts(defaults);
-    saveToLocal(defaults);
   };
 
   const getProductById = (id: string | number): ProductItem | undefined => {
@@ -280,4 +279,3 @@ export const useInventory = () => {
   }
   return context;
 };
-

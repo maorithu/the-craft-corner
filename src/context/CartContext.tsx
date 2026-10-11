@@ -1,6 +1,6 @@
 'use client';
 
-import React, { createContext, useContext, useState, useEffect } from 'react';
+import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { sound } from '@/utils/soundEffects';
 
 export type CartItem = {
@@ -72,6 +72,7 @@ type CartContextType = {
   toggleCart: () => void;
   toastMessage: string | null;
   orders: PlacedOrder[];
+  refreshOrders: () => Promise<void>;
   placeOrder: (order: {
     customerName: string;
     customerEmail: string;
@@ -90,244 +91,75 @@ type CartContextType = {
 
 const CartContext = createContext<CartContextType | undefined>(undefined);
 
-const DEFAULT_SAMPLE_ORDERS: PlacedOrder[] = [
-  {
-    orderCode: 'CRAFT-8821',
-    orderNumber: 8821,
-    customerName: 'Maya Chen',
-    customerEmail: 'maya.c@example.com',
-    customerAddress: '142 Rosewood Ave, Toronto, ON',
-    cardNumberMasked: '•••• •••• •••• 4821',
-    paymentMethod: 'paypal',
-    paypalOrderId: 'PAYID-M88219901',
-    items: [
-      {
-        cartId: 'demo-1',
-        productId: 1,
-        name: 'Articulated Crystal Wing Dragon (3D Printed)',
-        shortName: 'Crystal Wing Dragon',
-        price: 12.0,
-        displayPrice: '$12.00',
-        quantity: 1,
-        icon: '🐉',
-        categoryLabel: '3D Prints & Fidgets',
-      },
-      {
-        cartId: 'demo-2',
-        productId: 301,
-        name: 'Handcrafted Paper Dragon Hand Puppet',
-        shortName: 'Dragon Puppet',
-        price: 4.0,
-        displayPrice: '$4.00',
-        quantity: 1,
-        icon: '🐲',
-        categoryLabel: 'Puppets & Clickers',
-      },
-    ],
-    total: 16.0,
-    formattedTotal: '$16.00',
-    pickupOrShip: 'ship',
-    customerNotes: 'Please pack carefully, so excited for the dragon!',
-    status: 'Making',
-    createdAt: 'Today, 2:30 PM',
-    freeSpoonGift: false,
-    assignedStaffId: 'kaitlyn',
-  },
-  {
-    orderCode: 'CRAFT-8822',
-    orderNumber: 8822,
-    customerName: 'Leo Martinez',
-    customerEmail: 'leo.m@example.com',
-    customerAddress: '88 Willow Creek Rd, Vancouver, BC',
-    cardNumberMasked: '•••• •••• •••• 7192',
-    paymentMethod: 'paypal',
-    paypalOrderId: 'PAYID-L71920044',
-    items: [
-      {
-        cartId: 'demo-3',
-        productId: 6,
-        name: 'Matcha Boba Float DIY Slime',
-        shortName: 'Matcha Boba Slime',
-        price: 6.5,
-        displayPrice: '$6.50',
-        quantity: 1,
-        icon: '🧋',
-        categoryLabel: 'SlimeTea Studio',
-        customizationDetails: 'Thick & Glossy Base, Green Tea, Black Boba Pearls',
-      },
-    ],
-    total: 6.5,
-    formattedTotal: '$6.50',
-    pickupOrShip: 'ship',
-    customerNotes: 'Extra boba pearls please!',
-    status: 'Packed',
-    createdAt: 'Yesterday, 11:15 AM',
-    freeSpoonGift: false,
-    assignedStaffId: 'annabel',
-  },
-  {
-    orderCode: 'CRAFT-8820',
-    orderNumber: 8820,
-    customerName: 'Chloe Bennett',
-    customerEmail: 'chloe.b@example.com',
-    customerAddress: '55 Birch View Crescent, Markham, ON',
-    cardNumberMasked: '•••• •••• •••• 3301',
-    paymentMethod: 'paypal',
-    paypalOrderId: 'PAYID-C33018899',
-    items: [
-      {
-        cartId: 'demo-4',
-        productId: 5,
-        name: 'Strawberry Boba Cloud DIY Slime',
-        shortName: 'Strawberry Boba Slime',
-        price: 6.5,
-        displayPrice: '$6.50',
-        quantity: 2,
-        icon: '🍓',
-        categoryLabel: 'SlimeTea Studio',
-        customizationDetails: 'Fluffy Cloud Base, Sweet Berry, Pink Heart Pearls',
-      },
-      {
-        cartId: 'demo-5',
-        productId: 2,
-        name: 'Pastel Unicorn Horn Desk Fidget',
-        shortName: 'Unicorn Horn Fidget',
-        price: 5.5,
-        displayPrice: '$5.50',
-        quantity: 1,
-        icon: '🦄',
-        categoryLabel: '3D Prints & Fidgets',
-      },
-      {
-        cartId: 'demo-6',
-        productId: 101,
-        name: 'Beach Sunset Rainbow Loom Bracelet',
-        shortName: 'Beach Sunset Loom',
-        price: 2.0,
-        displayPrice: '$2.00',
-        quantity: 1,
-        icon: '🏖️',
-        categoryLabel: 'Rainbow Loom',
-      },
-    ],
-    total: 20.5,
-    formattedTotal: '$20.50',
-    pickupOrShip: 'delivery',
-    customerNotes: 'Please ring bell upon delivery!',
-    status: 'Delivering',
-    createdAt: 'Oct 12, 4:45 PM',
-    freeSpoonGift: false,
-    assignedStaffId: 'anna',
-  },
-  {
-    orderCode: 'CRAFT-8815',
-    orderNumber: 8815,
-    customerName: 'Ethan & Olivia Ward',
-    customerEmail: 'ward.family@example.com',
-    customerAddress: '12 Blossom Way, Richmond Hill, ON',
-    cardNumberMasked: '•••• •••• •••• 9012',
-    paymentMethod: 'paypal',
-    paypalOrderId: 'PAYID-E90123311',
-    items: [
-      {
-        cartId: 'demo-7',
-        productId: 1,
-        name: 'Articulated Crystal Wing Dragon (3D Printed)',
-        shortName: 'Crystal Wing Dragon',
-        price: 12.0,
-        displayPrice: '$12.00',
-        quantity: 2,
-        icon: '🐉',
-        categoryLabel: '3D Prints & Fidgets',
-      },
-      {
-        cartId: 'demo-8',
-        productId: 8,
-        name: 'Galaxy Nebula Clear DIY Slime',
-        shortName: 'Galaxy Slime',
-        price: 7.0,
-        displayPrice: '$7.00',
-        quantity: 2,
-        icon: '🌌',
-        categoryLabel: 'SlimeTea Studio',
-      },
-      {
-        cartId: 'demo-9',
-        productId: 201,
-        name: 'Pastel Rainbow Loom Mystery Box',
-        shortName: 'Pastel Mystery Box',
-        price: 2.5,
-        displayPrice: '$2.50',
-        quantity: 4,
-        icon: '🎁',
-        categoryLabel: 'Mystery Blind Boxes',
-      },
-      {
-        cartId: 'demo-10',
-        productId: 301,
-        name: 'Handcrafted Paper Dragon Hand Puppet',
-        shortName: 'Dragon Puppet',
-        price: 4.0,
-        displayPrice: '$4.00',
-        quantity: 2,
-        icon: '🐲',
-        categoryLabel: 'Puppets & Clickers',
-      },
-    ],
-    total: 56.0,
-    formattedTotal: '$56.00',
-    pickupOrShip: 'ship',
-    customerNotes: 'Birthday gifts! Please make them extra pretty.',
-    status: 'Delivered',
-    createdAt: 'Oct 10, 1:10 PM',
-    freeSpoonGift: true,
-    assignedStaffId: 'annabel',
-  },
-];
+const ORDERS_STORAGE_KEY = 'craftcorner_orders';
+const CART_STORAGE_KEY = 'craftcorner_cart';
 
 export function CartProvider({ children }: { children: React.ReactNode }) {
   const [cartItems, setCartItems] = useState<CartItem[]>([]);
   const [isCartOpen, setIsCartOpen] = useState(false);
   const [toastMessage, setToastMessage] = useState<string | null>(null);
-  const [orders, setOrders] = useState<PlacedOrder[]>(DEFAULT_SAMPLE_ORDERS);
+  const [orders, setOrders] = useState<PlacedOrder[]>([]);
   const [isClient, setIsClient] = useState(false);
 
-  // Load from localStorage on client mount
+  const saveOrdersToLocal = (list: PlacedOrder[]) => {
+    try {
+      localStorage.setItem(ORDERS_STORAGE_KEY, JSON.stringify(list));
+    } catch {
+      // Storage quota or disabled
+    }
+  };
+
+  const refreshOrders = useCallback(async () => {
+    try {
+      const res = await fetch('/api/orders', { cache: 'no-store' });
+      if (res.ok) {
+        const data = await res.json();
+        if (data.success && Array.isArray(data.orders)) {
+          setOrders(data.orders);
+          saveOrdersToLocal(data.orders);
+          return;
+        }
+      }
+    } catch (err) {
+      console.warn('Orders API fetch failed, falling back to local cache:', err);
+    }
+
+    try {
+      const savedOrders = localStorage.getItem(ORDERS_STORAGE_KEY);
+      if (savedOrders) {
+        const parsed = JSON.parse(savedOrders);
+        if (Array.isArray(parsed)) {
+          setOrders(parsed);
+        }
+      }
+    } catch {
+      // ignore
+    }
+  }, []);
+
+  // Load cart from localStorage and orders from DB API on client mount
   useEffect(() => {
     setIsClient(true);
     try {
-      const savedCart = localStorage.getItem('craftcorner_cart');
+      const savedCart = localStorage.getItem(CART_STORAGE_KEY);
       if (savedCart) {
         setCartItems(JSON.parse(savedCart));
-      }
-      const savedOrders = localStorage.getItem('craftcorner_orders');
-      if (savedOrders) {
-        setOrders(JSON.parse(savedOrders));
       }
     } catch {
       // Storage unavailable or invalid JSON
     }
-  }, []);
+    refreshOrders();
+  }, [refreshOrders]);
 
   // Save cart to localStorage
   useEffect(() => {
     if (!isClient) return;
     try {
-      localStorage.setItem('craftcorner_cart', JSON.stringify(cartItems));
+      localStorage.setItem(CART_STORAGE_KEY, JSON.stringify(cartItems));
     } catch {
       // Storage quota or disabled
     }
   }, [cartItems, isClient]);
-
-  // Save orders to localStorage
-  useEffect(() => {
-    if (!isClient) return;
-    try {
-      localStorage.setItem('craftcorner_orders', JSON.stringify(orders));
-    } catch {
-      // Storage quota or disabled
-    }
-  }, [orders, isClient]);
 
   const showToast = (msg: string) => {
     setToastMessage(msg);
@@ -360,8 +192,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
   ) => {
     const numPrice = parseNumericPrice(item.displayPrice);
 
-    // Build a unique cart key based on product + size + customization
-    const customSuffix = [item.size || '', item.customizationDetails || ''].filter(Boolean).join('::');
     const existingIndex = cartItems.findIndex(
       (ci) =>
         ci.productId === item.id &&
@@ -370,7 +200,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
     );
 
     if (existingIndex > -1) {
-      // Update existing item quantity
       setCartItems((prev) => {
         const next = [...prev];
         next[existingIndex] = {
@@ -380,7 +209,6 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         return next;
       });
     } else {
-      // Create new line item
       const newItem: CartItem = {
         cartId: `${item.id}-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
         productId: item.id,
@@ -479,45 +307,100 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
       freeSpoonGift: subtotal >= 50.0,
     };
 
-    setOrders((prev) => [newOrder, ...prev]);
+    setOrders((prev) => {
+      const next = [newOrder, ...prev];
+      saveOrdersToLocal(next);
+      return next;
+    });
     clearCart();
+
+    fetch('/api/orders', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify(newOrder),
+    })
+      .then(async (res) => {
+        if (res.ok) {
+          const data = await res.json();
+          if (data.success && data.order) {
+            setOrders((prev) => {
+              const next = prev.map((o) =>
+                o.orderCode === newOrder.orderCode ? data.order : o
+              );
+              saveOrdersToLocal(next);
+              return next;
+            });
+          }
+        }
+      })
+      .catch((err) => console.error('Failed to sync new order to database:', err));
+
     return newOrder;
   };
 
   const updateOrderStatus = (orderCode: string, newStatus: PlacedOrder['status']) => {
     sound.playClick();
-    setOrders((prev) =>
-      prev.map((ord) => (ord.orderCode === orderCode ? { ...ord, status: newStatus } : ord))
-    );
+    setOrders((prev) => {
+      const next = prev.map((ord) =>
+        ord.orderCode === orderCode ? { ...ord, status: newStatus } : ord
+      );
+      saveOrdersToLocal(next);
+      return next;
+    });
+
+    fetch('/api/orders', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderCode, status: newStatus }),
+    }).catch((err) => console.error('Failed to update order status in database:', err));
   };
 
   const assignOrderStaff = (orderCode: string, staffId: string) => {
     sound.playClick();
-    setOrders((prev) =>
-      prev.map((ord) =>
+    setOrders((prev) => {
+      const next = prev.map((ord) =>
         ord.orderCode === orderCode ? { ...ord, assignedStaffId: staffId || undefined } : ord
-      )
-    );
+      );
+      saveOrdersToLocal(next);
+      return next;
+    });
+
+    fetch('/api/orders', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderCode, assignedStaffId: staffId || '' }),
+    }).catch((err) => console.error('Failed to assign order staff in database:', err));
   };
 
   const setOrderInTemporaryTrash = (orderCode: string, isInTemporaryTrash: boolean) => {
     sound.playClick();
-    setOrders((prev) =>
-      prev.map((ord) =>
+    setOrders((prev) => {
+      const next = prev.map((ord) =>
         ord.orderCode === orderCode ? { ...ord, isInTemporaryTrash } : ord
-      )
-    );
+      );
+      saveOrdersToLocal(next);
+      return next;
+    });
+
+    fetch('/api/orders', {
+      method: 'PUT',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ orderCode, isInTemporaryTrash }),
+    }).catch((err) => console.error('Failed to update order trash status in database:', err));
   };
 
-  const getOrder = (query: string): PlacedOrder | undefined => {
-    const q = query.trim().toUpperCase();
-    return orders.find(
-      (o) =>
-        o.orderCode.toUpperCase() === q ||
-        o.orderNumber.toString() === q ||
-        o.customerEmail.toUpperCase() === q.toUpperCase()
-    );
-  };
+  const getOrder = useCallback(
+    (query: string): PlacedOrder | undefined => {
+      const q = query.trim().toUpperCase();
+      return orders.find(
+        (o) =>
+          o.orderCode.toUpperCase() === q ||
+          o.orderNumber.toString() === q ||
+          o.customerEmail.toUpperCase() === q
+      );
+    },
+    [orders]
+  );
 
   return (
     <CartContext.Provider
@@ -536,6 +419,7 @@ export function CartProvider({ children }: { children: React.ReactNode }) {
         toggleCart,
         toastMessage,
         orders,
+        refreshOrders,
         placeOrder,
         updateOrderStatus,
         assignOrderStaff,
@@ -555,4 +439,3 @@ export function useCart() {
   }
   return context;
 }
-

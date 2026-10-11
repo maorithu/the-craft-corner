@@ -20,7 +20,7 @@ export type SubCategory =
   | 'puppets';
 
 export type CraftItem = {
-  id: number;
+  id: number | string;
   itemNumber: string;
   name: string;
   shortName: string;

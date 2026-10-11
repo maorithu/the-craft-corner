@@ -1,9 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { craftItems } from '@/data/items';
 import { useCart } from '@/context/CartContext';
-import { useInventory } from '@/context/InventoryContext';
+import { useInventory, ProductItem } from '@/context/InventoryContext';
 import { sound } from '@/utils/soundEffects';
 import HiddenPal from '@/components/HiddenPal';
 import ScavengerHuntBoard from '@/components/ScavengerHuntBoard';
@@ -12,13 +11,15 @@ export default function HomePage() {
   const { addToCart } = useCart();
   const { products } = useInventory();
 
-  const catalog = products.length > 0 ? products : craftItems;
+  // Curate top 6 featured products (including newly added or featured items)
+  const featuredIds = ['101', '102', '1', '6', '4', '301'];
+  const featuredProducts = (
+    products.filter((it) => featuredIds.includes(String(it.id))).length > 0
+      ? products.filter((it) => featuredIds.includes(String(it.id)))
+      : products.slice(0, 6)
+  ).slice(0, 6);
 
-  // Curate 6 top products representing each staff department
-  const featuredIds = [101, 102, 1, 6, 4, 301];
-  const featuredProducts = catalog.filter((it) => featuredIds.includes(Number(it.id)));
-
-  const handleQuickAdd = (it: (typeof catalog)[0]) => {
+  const handleQuickAdd = (it: ProductItem) => {
     sound.playClick();
     addToCart({
       id: it.id,
@@ -29,6 +30,7 @@ export default function HomePage() {
       imageUrl: it.imageUrl,
       tag: it.tag,
       categoryLabel: it.categoryLabel,
+      staffInCharge: it.staffInCharge,
     });
   };
 
@@ -61,16 +63,16 @@ export default function HomePage() {
         </div>
       </section>
 
-      {/* Staff Department Highlights */}
+      {/* Craft Department Highlights */}
       <section className="home-depts-section">
         <div className="home-section-header">
-          <span className="section-pill">🎨 Meet Our Craft Leads</span>
+          <span className="section-pill">🎨 Craft Studios</span>
           <h2>Explore by Craft Department</h2>
-          <p>Each staff member specializes in handcrafting their own unique creations!</p>
+          <p>Each studio section specializes in handcrafting unique creations!</p>
         </div>
 
         <div className="home-dept-cards-grid">
-          {/* Kaitlyn's Department */}
+          {/* Dragon & 3D Print Department */}
           <Link href="/shop?category=3d-prints" className="home-dept-card dept-kaitlyn">
             <div className="dept-card-top">
               <span className="dept-icon">🐉</span>
@@ -117,7 +119,15 @@ export default function HomePage() {
           {featuredProducts.map((it) => (
             <div key={it.id} className="home-product-card">
               <div className="product-card-top">
-                <span className="product-icon-tag">{it.icon || '✨'}</span>
+                {it.imageUrl ? (
+                  <img
+                    src={it.imageUrl}
+                    alt={it.name}
+                    style={{ width: '44px', height: '44px', borderRadius: '8px', objectFit: 'cover' }}
+                  />
+                ) : (
+                  <span className="product-icon-tag">{it.icon || '✨'}</span>
+                )}
                 {it.tag && <span className="product-meta-pill">{it.tag}</span>}
               </div>
 
@@ -160,7 +170,7 @@ export default function HomePage() {
           </div>
           <div className="home-catalog-link-wrap">
             <Link href="/catalog/" className="home-catalog-link">
-              📖 Browse Master Product Catalog ({catalog.length} items) →
+              📖 Browse Master Product Catalog ({products.length} items) →
             </Link>
           </div>
         </div>

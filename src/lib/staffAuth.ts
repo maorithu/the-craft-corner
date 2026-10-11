@@ -40,7 +40,7 @@ export async function authenticateStaff(username: string, password: string): Pro
         colorBg: '#eff6ff',
         colorBorder: '#bfdbfe',
         colorText: '#1e3a8a',
-        permissions: ['manage_orders'],
+        permissions: ['manage_orders', 'manage_inventory'],
       };
     }
 
@@ -77,5 +77,19 @@ export async function getStaffDirectory(): Promise<StaffProfile[]> {
     return Array.isArray(result.staff) ? result.staff : [];
   } catch {
     return [];
+  }
+}
+
+export async function deleteStaffAccount(id: string): Promise<boolean> {
+  try {
+    const response = await fetch(`/api/staff-users?id=${encodeURIComponent(id)}`, {
+      method: 'DELETE',
+      cache: 'no-store',
+    });
+    if (!response.ok) return false;
+    const result = (await response.json()) as { success?: boolean };
+    return Boolean(result.success);
+  } catch {
+    return false;
   }
 }
